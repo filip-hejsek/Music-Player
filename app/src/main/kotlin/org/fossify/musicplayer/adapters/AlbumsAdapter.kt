@@ -44,7 +44,6 @@ class AlbumsAdapter(activity: BaseSimpleActivity, items: ArrayList<Album>, recyc
         when (id) {
             R.id.cab_add_to_playlist -> addToPlaylist()
             R.id.cab_add_to_queue -> addToQueue()
-            R.id.cab_delete -> askConfirmDelete()
             R.id.cab_share -> shareFiles()
             R.id.cab_select_all -> selectAll()
         }
@@ -52,29 +51,6 @@ class AlbumsAdapter(activity: BaseSimpleActivity, items: ArrayList<Album>, recyc
 
     override fun getSelectedTracks(): List<Track> {
         return context.audioHelper.getAlbumTracks(getSelectedItems())
-    }
-
-    private fun askConfirmDelete() {
-        ConfirmationDialog(context) {
-            ensureBackgroundThread {
-                val selectedAlbums = getSelectedItems()
-                val positions = selectedAlbums.mapNotNull { album -> items.indexOfFirstOrNull { it.id == album.id } } as ArrayList<Int>
-                val tracks = context.audioHelper.getAlbumTracks(selectedAlbums)
-                context.audioHelper.deleteAlbums(selectedAlbums)
-
-                context.deleteTracks(tracks) {
-                    context.runOnUiThread {
-                        positions.sortDescending()
-                        removeSelectedItems(positions)
-                        positions.forEach {
-                            if (items.size > it) {
-                                items.removeAt(it)
-                            }
-                        }
-                    }
-                }
-            }
-        }
     }
 
     private fun setupView(view: View, album: Album) {

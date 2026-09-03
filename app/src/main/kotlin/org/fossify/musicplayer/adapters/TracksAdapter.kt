@@ -72,7 +72,6 @@ class TracksAdapter(
     override fun prepareActionMode(menu: Menu) {
         menu.apply {
             findItem(R.id.cab_remove_from_playlist).isVisible = isPlaylistContent()
-            findItem(R.id.cab_rename).isVisible = shouldShowRename()
             findItem(R.id.cab_play_next).isVisible = shouldShowPlayNext()
         }
     }
@@ -86,9 +85,7 @@ class TracksAdapter(
             R.id.cab_add_to_playlist -> addToPlaylist()
             R.id.cab_add_to_queue -> addToQueue()
             R.id.cab_properties -> showProperties()
-            R.id.cab_rename -> displayEditDialog()
             R.id.cab_remove_from_playlist -> removeFromPlaylist(playlist)
-            R.id.cab_delete -> askConfirmDelete()
             R.id.cab_share -> shareFiles()
             R.id.cab_select_all -> selectAll()
             R.id.cab_play_next -> playNextInQueue()
@@ -142,40 +139,6 @@ class TracksAdapter(
         }
     }
 
-    private fun askConfirmDelete() {
-        ConfirmationDialog(context) {
-            ensureBackgroundThread {
-                val positions = ArrayList<Int>()
-                val selectedTracks = getSelectedTracks()
-                selectedTracks.forEach { track ->
-                    val position = items.indexOfFirst { it.mediaStoreId == track.mediaStoreId }
-                    if (position != -1) {
-                        positions.add(position)
-                    }
-                }
-
-                context.deleteTracks(selectedTracks) {
-                    context.runOnUiThread {
-                        positions.sortDescending()
-                        removeSelectedItems(positions)
-                        positions.forEach {
-                            if (items.size > it) {
-                                items.removeAt(it)
-                            }
-                        }
-
-                        finishActMode()
-
-                        // finish activity if all tracks are deleted
-                        if (items.isEmpty() && !isPlaylistContent()) {
-                            context.finish()
-                        }
-                    }
-                }
-            }
-        }
-    }
-
     override fun getSelectedTracks(): List<Track> = items.filter { selectedKeys.contains(it.hashCode()) }
 
     @SuppressLint("ClickableViewAccessibility")
@@ -222,19 +185,6 @@ class TracksAdapter(
         }
 
         return items.getOrNull(position)?.getBubbleText(sorting) ?: ""
-    }
-
-    private fun displayEditDialog() {
-        getSelectedTracks().firstOrNull()?.let { selectedTrack ->
-            EditDialog(context, selectedTrack) { track ->
-                val trackIndex = items.indexOfFirstOrNull { it.mediaStoreId == track.mediaStoreId } ?: return@EditDialog
-                items[trackIndex] = track
-                notifyItemChanged(trackIndex)
-                finishActMode()
-
-                context.refreshQueueAndTracks(track)
-            }
-        }
     }
 
     override fun onRowMoved(fromPosition: Int, toPosition: Int) {

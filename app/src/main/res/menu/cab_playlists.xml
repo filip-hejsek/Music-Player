@@ -4,16 +4,10 @@
     xmlns:tools="http://schemas.android.com/tools"
     tools:ignore="AppCompatResource,AlwaysShowAction">
     <item
-        android:id="@+id/cab_rename"
-        android:icon="@drawable/ic_rename_vector"
-        android:showAsAction="always"
-        android:title="@string/rename"
-        app:showAsAction="always" />
-    <item
         android:id="@+id/cab_delete"
         android:icon="@drawable/ic_delete_vector"
         android:showAsAction="always"
-        android:title="@string/delete"
+        android:title="@string/remove_playlist"
         app:showAsAction="always" />
     <item
         android:id="@+id/cab_select_all"

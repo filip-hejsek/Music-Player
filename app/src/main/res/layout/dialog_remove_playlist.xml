@@ -18,12 +18,4 @@
         android:text="@string/remove_playlist_description"
         android:textSize="@dimen/bigger_text_size" />
 
-    <org.fossify.commons.views.MyAppCompatCheckbox
-        android:id="@+id/remove_playlist_checkbox"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:paddingTop="@dimen/small_margin"
-        android:paddingBottom="@dimen/small_margin"
-        android:text="@string/delete_the_files_too" />
-
 </LinearLayout>

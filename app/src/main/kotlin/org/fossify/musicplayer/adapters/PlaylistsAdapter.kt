@@ -40,33 +40,19 @@ class PlaylistsAdapter(
     }
 
     override fun prepareActionMode(menu: Menu) {
-        menu.apply {
-            findItem(R.id.cab_rename).isVisible = isOneItemSelected()
-        }
     }
 
     override fun actionItemPressed(id: Int) {
         when (id) {
             R.id.cab_delete -> askConfirmDelete()
-            R.id.cab_rename -> showRenameDialog()
             R.id.cab_select_all -> selectAll()
         }
     }
 
     private fun askConfirmDelete() {
-        RemovePlaylistDialog(context) { deleteFiles ->
+        RemovePlaylistDialog(context) {
             val playlists = getSelectedItems().toMutableList() as ArrayList<Playlist>
-            val ids = playlists.map { it.id } as ArrayList<Int>
-            if (deleteFiles) {
-                ensureBackgroundThread {
-                    val tracksToDelete = ids.flatMap { context.audioHelper.getPlaylistTracks(it) }
-                    context.deleteTracks(tracksToDelete) {
-                        removePlaylists(playlists)
-                    }
-                }
-            } else {
-                removePlaylists(playlists)
-            }
+            removePlaylists(playlists)
         }
     }
 
@@ -83,14 +69,6 @@ class PlaylistsAdapter(
             }
 
             EventBus.getDefault().post(Events.PlaylistsUpdated())
-        }
-    }
-
-    private fun showRenameDialog() {
-        NewPlaylistDialog(context, items[getItemKeyPosition(selectedKeys.first())]) {
-            context.runOnUiThread {
-                finishActMode()
-            }
         }
     }
 

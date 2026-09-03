@@ -32,24 +32,6 @@ fun Activity.addTracksToPlaylist(tracks: List<Track>, callback: () -> Unit) {
     }
 }
 
-fun Activity.maybeRescanTrackPaths(tracks: List<Track>, callback: (tracks: List<Track>) -> Unit) {
-    val tracksWithoutId = tracks.filter { it.mediaStoreId == 0L || (it.flags and FLAG_MANUAL_CACHE != 0) }
-    if (tracksWithoutId.isNotEmpty()) {
-        val pathsToRescan = tracksWithoutId.map { it.path }
-        rescanPaths(pathsToRescan) {
-            for (track in tracks) {
-                if (track.mediaStoreId == 0L || (track.flags and FLAG_MANUAL_CACHE != 0)) {
-                    track.mediaStoreId = getMediaStoreIdFromPath(track.path)
-                }
-            }
-
-            callback(tracks)
-        }
-    } else {
-        callback(tracks)
-    }
-}
-
 fun Activity.showTrackProperties(selectedTracks: List<Track>) {
     val selectedPaths = selectedTracks.map { track ->
         track.path.ifEmpty {

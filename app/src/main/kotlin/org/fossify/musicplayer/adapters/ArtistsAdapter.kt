@@ -45,7 +45,6 @@ class ArtistsAdapter(activity: BaseSimpleActivity, items: ArrayList<Artist>, rec
         when (id) {
             R.id.cab_add_to_playlist -> addToPlaylist()
             R.id.cab_add_to_queue -> addToQueue()
-            R.id.cab_delete -> askConfirmDelete()
             R.id.cab_share -> shareFiles()
             R.id.cab_select_all -> selectAll()
         }
@@ -54,29 +53,6 @@ class ArtistsAdapter(activity: BaseSimpleActivity, items: ArrayList<Artist>, rec
     override fun getSelectedTracks(): ArrayList<Track> {
         val albums = context.audioHelper.getArtistAlbums(getSelectedItems())
         return context.audioHelper.getAlbumTracks(albums)
-    }
-
-    private fun askConfirmDelete() {
-        ConfirmationDialog(context) {
-            ensureBackgroundThread {
-                val selectedArtists = getSelectedItems()
-                val positions = selectedArtists.mapNotNull { artist -> items.indexOfFirstOrNull { it.id == artist.id } } as ArrayList<Int>
-                val tracks = context.audioHelper.getArtistTracks(selectedArtists)
-
-                context.audioHelper.deleteArtists(selectedArtists)
-                context.deleteTracks(tracks) {
-                    context.runOnUiThread {
-                        positions.sortDescending()
-                        removeSelectedItems(positions)
-                        positions.forEach {
-                            if (items.size > it) {
-                                items.removeAt(it)
-                            }
-                        }
-                    }
-                }
-            }
-        }
     }
 
     private fun setupView(view: View, artist: Artist) {

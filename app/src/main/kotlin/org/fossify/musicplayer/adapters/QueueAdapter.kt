@@ -63,7 +63,6 @@ class QueueAdapter(activity: SimpleActivity, items: ArrayList<Track>, var curren
 
         when (id) {
             R.id.cab_remove_from_queue -> removeFromQueue()
-            R.id.cab_delete_file -> deleteTracks()
             R.id.cab_share -> shareFiles()
             R.id.cab_add_to_playlist -> addToPlaylist()
             R.id.cab_select_all -> selectAll()
@@ -103,23 +102,6 @@ class QueueAdapter(activity: SimpleActivity, items: ArrayList<Track>, var curren
 
         context.removeQueueItems(selectedTracks) {
             refreshTracksList(positions)
-        }
-    }
-
-    private fun deleteTracks() {
-        ConfirmationDialog(context, "", R.string.delete_song_warning, org.fossify.commons.R.string.ok, org.fossify.commons.R.string.cancel) {
-            val positions = ArrayList<Int>()
-            val selectedTracks = getSelectedTracks()
-            selectedTracks.forEach { track ->
-                val position = items.indexOfFirst { it.mediaStoreId == track.mediaStoreId }
-                if (position != -1) {
-                    positions.add(position)
-                }
-            }
-
-            context.deleteTracks(selectedTracks) {
-                refreshTracksList(positions)
-            }
         }
     }
 

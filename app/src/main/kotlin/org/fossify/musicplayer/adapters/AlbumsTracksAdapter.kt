@@ -72,7 +72,6 @@ class AlbumsTracksAdapter(
     override fun prepareActionMode(menu: Menu) {
         menu.apply {
             findItem(R.id.cab_play_next).isVisible = shouldShowPlayNext()
-            findItem(R.id.cab_rename).isVisible = shouldShowRename()
         }
     }
 
@@ -85,9 +84,7 @@ class AlbumsTracksAdapter(
             R.id.cab_add_to_playlist -> addToPlaylist()
             R.id.cab_add_to_queue -> addToQueue()
             R.id.cab_properties -> showProperties()
-            R.id.cab_delete -> askConfirmDelete()
             R.id.cab_share -> shareFiles()
-            R.id.cab_rename -> displayEditDialog()
             R.id.cab_select_all -> selectAll()
             R.id.cab_play_next -> playNextInQueue()
         }
@@ -96,34 +93,6 @@ class AlbumsTracksAdapter(
     override fun getSelectableItemCount() = items.filter { it !is AlbumSection }.size
 
     override fun getIsItemSelectable(position: Int) = items[position] !is AlbumSection
-
-    private fun askConfirmDelete() {
-        ConfirmationDialog(context) {
-            ensureBackgroundThread {
-                val positions = ArrayList<Int>()
-                val selectedTracks = getAllSelectedTracks()
-                val selectedAlbums = getSelectedAlbums()
-
-                positions += selectedTracks.mapNotNull { track -> items.indexOfFirstOrNull { it is Track && it.mediaStoreId == track.mediaStoreId } }
-                positions += selectedAlbums.mapNotNull { album -> items.indexOfFirstOrNull { it is Album && it.id == album.id } }
-
-                context.deleteTracks(selectedTracks) {
-                    context.runOnUiThread {
-                        positions.sortDescending()
-                        removeSelectedItems(positions)
-                        positions.forEach {
-                            items.removeAt(it)
-                        }
-
-                        // finish activity if all tracks are deleted
-                        if (items.none { it is Track }) {
-                            context.finish()
-                        }
-                    }
-                }
-            }
-        }
-    }
 
     override fun getAllSelectedTracks(): List<Track> {
         val tracks = getSelectedTracks().toMutableList()
@@ -184,18 +153,4 @@ class AlbumsTracksAdapter(
         }
     }
 
-    private fun displayEditDialog() {
-        getSelectedTracks().firstOrNull()?.let { selectedTrack ->
-            EditDialog(context as SimpleActivity, selectedTrack) { track ->
-                val trackIndex = items.indexOfFirst { (it as? Track)?.mediaStoreId == track.mediaStoreId }
-                if (trackIndex != -1) {
-                    items[trackIndex] = track
-                    notifyItemChanged(trackIndex)
-                    finishActMode()
-                }
-
-                context.refreshQueueAndTracks(track)
-            }
-        }
-    }
 }

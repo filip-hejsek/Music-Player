@@ -64,7 +64,6 @@ class TracksHeaderAdapter(activity: SimpleActivity, items: ArrayList<ListItem>, 
 
     override fun prepareActionMode(menu: Menu) {
         menu.apply {
-            findItem(R.id.cab_rename).isVisible = shouldShowRename()
             findItem(R.id.cab_play_next).isVisible = shouldShowPlayNext()
         }
     }
@@ -78,9 +77,7 @@ class TracksHeaderAdapter(activity: SimpleActivity, items: ArrayList<ListItem>, 
             R.id.cab_add_to_playlist -> addToPlaylist()
             R.id.cab_add_to_queue -> addToQueue()
             R.id.cab_properties -> showProperties()
-            R.id.cab_delete -> askConfirmDelete()
             R.id.cab_share -> shareFiles()
-            R.id.cab_rename -> displayEditDialog()
             R.id.cab_select_all -> selectAll()
             R.id.cab_play_next -> playNextInQueue()
         }
@@ -89,36 +86,6 @@ class TracksHeaderAdapter(activity: SimpleActivity, items: ArrayList<ListItem>, 
     override fun getSelectableItemCount() = items.size - 1
 
     override fun getIsItemSelectable(position: Int) = position != 0
-
-    private fun askConfirmDelete() {
-        ConfirmationDialog(context) {
-            ensureBackgroundThread {
-                val positions = ArrayList<Int>()
-                val selectedTracks = getSelectedTracks()
-                selectedTracks.forEach { track ->
-                    val position = items.indexOfFirst { it is Track && it.mediaStoreId == track.mediaStoreId }
-                    if (position != -1) {
-                        positions.add(position)
-                    }
-                }
-
-                context.deleteTracks(selectedTracks) {
-                    context.runOnUiThread {
-                        positions.sortDescending()
-                        removeSelectedItems(positions)
-                        positions.forEach {
-                            items.removeAt(it)
-                        }
-
-                        // finish activity if all tracks are deleted
-                        if (items.none { it is Track }) {
-                            context.finish()
-                        }
-                    }
-                }
-            }
-        }
-    }
 
     private fun setupTrack(view: View, track: Track) {
         ItemTrackBinding.bind(view).apply {
@@ -184,18 +151,4 @@ class TracksHeaderAdapter(activity: SimpleActivity, items: ArrayList<ListItem>, 
         }
     }
 
-    private fun displayEditDialog() {
-        getSelectedTracks().firstOrNull()?.let { selectedTrack ->
-            EditDialog(context, selectedTrack) { track ->
-                val trackIndex = items.indexOfFirst { (it as? Track)?.mediaStoreId == track.mediaStoreId }
-                if (trackIndex != -1) {
-                    items[trackIndex] = track
-                    notifyItemChanged(trackIndex)
-                    finishActMode()
-                }
-
-                context.refreshQueueAndTracks(track)
-            }
-        }
-    }
 }

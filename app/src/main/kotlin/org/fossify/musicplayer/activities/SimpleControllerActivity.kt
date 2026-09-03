@@ -114,46 +114,6 @@ abstract class SimpleControllerActivity : SimpleActivity(), Player.Listener {
         }
     }
 
-    fun deleteTracks(tracks: List<Track>, callback: () -> Unit) {
-        try {
-            audioHelper.deleteTracks(tracks)
-            audioHelper.removeInvalidAlbumsArtists()
-        } catch (ignored: Exception) {
-        }
-
-        val contentUri = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
-        maybeRescanTrackPaths(tracks) { tracksToDelete ->
-            if (tracksToDelete.isNotEmpty()) {
-                if (isRPlus()) {
-                    val uris = tracksToDelete.map { ContentUris.withAppendedId(contentUri, it.mediaStoreId) }
-                    deleteSDK30Uris(uris) { success ->
-                        if (success) {
-                            removeQueueItems(tracksToDelete)
-                            EventBus.getDefault().post(Events.RefreshFragments())
-                            callback()
-                        } else {
-                            toast(org.fossify.commons.R.string.unknown_error_occurred)
-                        }
-                    }
-                } else {
-                    tracksToDelete.forEach { track ->
-                        try {
-                            val where = "${MediaStore.Audio.Media._ID} = ?"
-                            val args = arrayOf(track.mediaStoreId.toString())
-                            contentResolver.delete(contentUri, where, args)
-                            File(track.path).delete()
-                        } catch (ignored: Exception) {
-                        }
-                    }
-
-                    removeQueueItems(tracksToDelete)
-                    EventBus.getDefault().post(Events.RefreshFragments())
-                    callback()
-                }
-            }
-        }
-    }
-
     fun refreshQueueAndTracks(trackToUpdate: Track? = null) {
         ensureBackgroundThread {
             val queuedTracks = audioHelper.getQueuedTracks()

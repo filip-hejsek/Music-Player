@@ -8,13 +8,13 @@ import org.fossify.musicplayer.R
 import org.fossify.musicplayer.databinding.DialogRemovePlaylistBinding
 import org.fossify.musicplayer.models.Playlist
 
-class RemovePlaylistDialog(val activity: Activity, val playlist: Playlist? = null, val callback: (deleteFiles: Boolean) -> Unit) {
+class RemovePlaylistDialog(val activity: Activity, val playlist: Playlist? = null, val callback: () -> Unit) {
     private val binding by activity.viewBinding(DialogRemovePlaylistBinding::inflate)
 
     init {
         binding.removePlaylistDescription.text = getDescriptionText()
         activity.getAlertDialogBuilder()
-            .setPositiveButton(org.fossify.commons.R.string.ok) { _, _ -> callback(binding.removePlaylistCheckbox.isChecked) }
+            .setPositiveButton(org.fossify.commons.R.string.ok) { _, _ -> callback() }
             .setNegativeButton(org.fossify.commons.R.string.cancel, null)
             .apply {
                 activity.setupDialogStuff(binding.root, this, R.string.remove_playlist)

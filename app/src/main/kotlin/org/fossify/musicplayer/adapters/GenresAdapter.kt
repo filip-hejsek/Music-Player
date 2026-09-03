@@ -44,7 +44,6 @@ class GenresAdapter(activity: BaseSimpleActivity, items: ArrayList<Genre>, recyc
         when (id) {
             R.id.cab_add_to_playlist -> addToPlaylist()
             R.id.cab_add_to_queue -> addToQueue()
-            R.id.cab_delete -> askConfirmDelete()
             R.id.cab_share -> shareFiles()
             R.id.cab_select_all -> selectAll()
         }
@@ -52,29 +51,6 @@ class GenresAdapter(activity: BaseSimpleActivity, items: ArrayList<Genre>, recyc
 
     override fun getSelectedTracks(): ArrayList<Track> {
         return context.audioHelper.getGenreTracks(getSelectedItems())
-    }
-
-    private fun askConfirmDelete() {
-        ConfirmationDialog(context) {
-            ensureBackgroundThread {
-                val selectedGenres = getSelectedItems()
-                val positions = selectedGenres.mapNotNull { genre -> items.indexOfFirstOrNull { it.id == genre.id } } as ArrayList<Int>
-                val tracks = context.audioHelper.getGenreTracks(selectedGenres)
-                context.audioHelper.deleteGenres(selectedGenres)
-
-                context.deleteTracks(tracks) {
-                    context.runOnUiThread {
-                        positions.sortDescending()
-                        removeSelectedItems(positions)
-                        positions.forEach {
-                            if (items.size > it) {
-                                items.removeAt(it)
-                            }
-                        }
-                    }
-                }
-            }
-        }
     }
 
     private fun setupView(view: View, genre: Genre) {
