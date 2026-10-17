@@ -16,7 +16,6 @@ import org.fossify.commons.dialogs.FilePickerDialog
 import org.fossify.commons.dialogs.RadioGroupDialog
 import org.fossify.commons.extensions.*
 import org.fossify.commons.helpers.*
-import org.fossify.commons.models.FAQItem
 import org.fossify.commons.models.RadioItem
 import org.fossify.commons.models.Release
 import org.fossify.musicplayer.R
@@ -167,7 +166,6 @@ class MainActivity : SimpleMusicActivity() {
                 R.id.import_playlist -> tryImportPlaylist()
                 R.id.equalizer -> launchEqualizer()
                 R.id.settings -> launchSettings()
-                R.id.about -> launchAbout()
                 else -> return@setOnMenuItemClickListener false
             }
             return@setOnMenuItemClickListener true
@@ -529,24 +527,6 @@ class MainActivity : SimpleMusicActivity() {
     private fun launchSettings() {
         hideKeyboard()
         startActivity(Intent(applicationContext, SettingsActivity::class.java))
-    }
-
-    private fun launchAbout() {
-        val licenses = LICENSE_EVENT_BUS or LICENSE_GLIDE or LICENSE_M3U_PARSER or LICENSE_AUTOFITTEXTVIEW
-
-        val faqItems = arrayListOf(
-            FAQItem(R.string.faq_1_title, R.string.faq_1_text),
-            FAQItem(org.fossify.commons.R.string.faq_1_title_commons, org.fossify.commons.R.string.faq_1_text_commons),
-            FAQItem(org.fossify.commons.R.string.faq_4_title_commons, org.fossify.commons.R.string.faq_4_text_commons),
-            FAQItem(org.fossify.commons.R.string.faq_9_title_commons, org.fossify.commons.R.string.faq_9_text_commons)
-        )
-
-        if (resources.getBoolean(org.fossify.commons.R.bool.is_google_play_build)) {
-            faqItems.add(FAQItem(org.fossify.commons.R.string.faq_2_title_commons, org.fossify.commons.R.string.faq_2_text_commons))
-            faqItems.add(FAQItem(org.fossify.commons.R.string.faq_6_title_commons, org.fossify.commons.R.string.faq_6_text_commons))
-        }
-
-        startAboutActivity(R.string.app_name, licenses, BuildConfig.VERSION_NAME, faqItems, true)
     }
 
     private fun checkWhatsNewDialog() {
