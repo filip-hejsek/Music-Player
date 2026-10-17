@@ -1,4 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-
+    <!--
+        Override the default theme color from the shared library (green) so that this
+        fork is easy to tell apart from the upstream app. color_accent, default_primary_color,
+        default_app_icon_color etc. all derive from color_primary.
+        md_deep_purple_700 is also the color of the library's "Deep_purple" icon preset.
+    -->
+    <color name="color_primary">@color/md_deep_purple_700</color>
+    <color name="color_primary_dark">@color/md_deep_purple_200_dark</color>
 </resources>
