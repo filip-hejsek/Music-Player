@@ -139,8 +139,6 @@ class MainActivity : SimpleMusicActivity() {
             findItem(R.id.create_new_playlist).isVisible = isPlaylistFragment
             findItem(R.id.create_playlist_from_folder).isVisible = isPlaylistFragment
             findItem(R.id.import_playlist).isVisible = isPlaylistFragment
-            findItem(R.id.more_apps_from_us).isVisible =
-                resources.getBoolean(org.fossify.commons.R.bool.is_google_play_build)
         }
     }
 
@@ -168,7 +166,6 @@ class MainActivity : SimpleMusicActivity() {
                 R.id.create_playlist_from_folder -> createPlaylistFromFolder()
                 R.id.import_playlist -> tryImportPlaylist()
                 R.id.equalizer -> launchEqualizer()
-                R.id.more_apps_from_us -> launchMoreAppsFromUsIntent()
                 R.id.settings -> launchSettings()
                 R.id.about -> launchAbout()
                 else -> return@setOnMenuItemClickListener false
