@@ -60,6 +60,7 @@ abstract class SongsDatabase : RoomDatabase() {
                             .addMigrations(MIGRATION_12_13)
                             .addMigrations(MIGRATION_13_14)
                             .addMigrations(MIGRATION_14_15)
+                            .addMigrations(MIGRATION_15_16)
                             .build()
                     }
                 }
@@ -241,6 +242,46 @@ abstract class SongsDatabase : RoomDatabase() {
                     execSQL("DROP TABLE tracks")
                     execSQL("ALTER TABLE tracks_new RENAME to tracks")
                     execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_tracks_id` ON `tracks` (`media_store_id`, `playlist_id`)")
+                }
+            }
+        }
+
+        /**
+         * Adds the logical queue tables and converts the old `queue_items` queue into them, so the queue
+         * survives the update.
+         *
+         * `queue_items` is deliberately *not* dropped yet: the playback code still reads and writes it
+         * until it is rewired to the new queue. Drop it (here, if this was never released, or in a
+         * 16 -> 17 migration) together with `QueueItem`/`QueueItemsDao` when that happens.
+         *
+         * The old queue is stored in unshuffled timeline order, so a shuffled order is not preserved.
+         */
+        private val MIGRATION_15_16 = object : Migration(15, 16) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.apply {
+                    execSQL("CREATE TABLE IF NOT EXISTS `queue_groups` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `label` TEXT NOT NULL, `source` TEXT NOT NULL, `source_id` INTEGER)")
+                    execSQL(
+                        "CREATE TABLE IF NOT EXISTS `queue_entries` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `position` REAL NOT NULL, `type` TEXT NOT NULL, " +
+                            "`track_id` INTEGER, `completed_repetitions` INTEGER NOT NULL, `remaining_repetitions` INTEGER, `group_id` INTEGER, " +
+                            "FOREIGN KEY(`group_id`) REFERENCES `queue_groups`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL)"
+                    )
+                    execSQL("CREATE INDEX IF NOT EXISTS `index_queue_entries_position` ON `queue_entries` (`position`)")
+                    execSQL("CREATE INDEX IF NOT EXISTS `index_queue_entries_group_id` ON `queue_entries` (`group_id`)")
+                    execSQL("CREATE TABLE IF NOT EXISTS `playback_cursor` (`id` INTEGER NOT NULL, `head_position` REAL NOT NULL, `is_active` INTEGER NOT NULL, `position_ms` INTEGER NOT NULL, PRIMARY KEY(`id`))")
+
+                    // each old row becomes a track entry that plays once
+                    execSQL(
+                        "INSERT INTO queue_entries (position, type, track_id, completed_repetitions, remaining_repetitions) " +
+                            "SELECT CAST(track_order AS REAL), 'TRACK', track_id, 0, 1 FROM queue_items ORDER BY track_order"
+                    )
+
+                    // the old current track becomes the head, everything before it becomes history
+                    execSQL(
+                        "INSERT INTO playback_cursor (id, head_position, is_active, position_ms) VALUES (0, " +
+                            "COALESCE((SELECT CAST(track_order AS REAL) FROM queue_items WHERE is_current = 1 LIMIT 1), 0.0), " +
+                            "COALESCE((SELECT last_position > 0 FROM queue_items WHERE is_current = 1 LIMIT 1), 0), " +
+                            "COALESCE((SELECT last_position * 1000 FROM queue_items WHERE is_current = 1 LIMIT 1), 0))"
+                    )
                 }
             }
         }
