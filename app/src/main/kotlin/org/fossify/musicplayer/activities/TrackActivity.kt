@@ -20,10 +20,9 @@ import androidx.media3.common.MediaItem
 import com.bumptech.glide.load.resource.bitmap.CenterCrop
 import com.bumptech.glide.load.resource.bitmap.RoundedCorners
 import com.bumptech.glide.request.RequestOptions
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.launch
 import org.fossify.commons.extensions.applyColorFilter
 import org.fossify.commons.extensions.beGone
@@ -44,16 +43,12 @@ import org.fossify.musicplayer.R
 import org.fossify.musicplayer.databinding.ActivityTrackBinding
 import org.fossify.musicplayer.extensions.config
 import org.fossify.musicplayer.extensions.getCoverArtHeight
-import org.fossify.musicplayer.extensions.getPlaybackSetting
 import org.fossify.musicplayer.extensions.getTrackCoverArt
 import org.fossify.musicplayer.extensions.getTrackFromUri
 import org.fossify.musicplayer.extensions.isReallyPlaying
 import org.fossify.musicplayer.extensions.loadGlideResource
-import org.fossify.musicplayer.extensions.maybeRestartOnPrevious
 import org.fossify.musicplayer.extensions.nextMediaItem
 import org.fossify.musicplayer.extensions.sendCommand
-import org.fossify.musicplayer.extensions.setRepeatMode
-import org.fossify.musicplayer.extensions.shuffledMediaItemsIndices
 import org.fossify.musicplayer.extensions.toMediaItem
 import org.fossify.musicplayer.extensions.toTrack
 import org.fossify.musicplayer.extensions.updatePlayPauseIcon
@@ -64,6 +59,8 @@ import org.fossify.musicplayer.interfaces.PlaybackSpeedListener
 import org.fossify.musicplayer.models.Track
 import org.fossify.musicplayer.playback.CustomCommands
 import org.fossify.musicplayer.playback.PlaybackService
+import org.fossify.musicplayer.playback.queue.QueueEntry
+import org.fossify.musicplayer.playback.queue.QueueState
 import java.text.DecimalFormat
 import kotlin.math.min
 import kotlin.time.Duration.Companion.milliseconds
@@ -71,7 +68,6 @@ import kotlin.time.Duration.Companion.milliseconds
 class TrackActivity : SimpleControllerActivity(), PlaybackSpeedListener {
     companion object {
         private const val SWIPE_DOWN_THRESHOLD = 100
-        private const val SEEK_COALESCE_INTERVAL_MS = 150L
         private const val UPDATE_INTERVAL_MS = 150L
     }
 
@@ -79,10 +75,6 @@ class TrackActivity : SimpleControllerActivity(), PlaybackSpeedListener {
     private lateinit var nextTrackPlaceholder: Drawable
 
     private val handler = Handler(Looper.getMainLooper())
-
-    private val scope = CoroutineScope(Dispatchers.Default)
-    private var seekJob: Job? = null
-    private var seekCount = 0
 
     private val binding by viewBinding(ActivityTrackBinding::inflate)
 
@@ -94,6 +86,11 @@ class TrackActivity : SimpleControllerActivity(), PlaybackSpeedListener {
             resources.getColoredDrawableWithColor(R.drawable.ic_headset, getProperTextColor())
         setupButtons()
         setupFlingListener()
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                PlaybackService.queueState.collect { renderQueueState(it) }
+            }
+        }
 
         binding.apply {
             activityTrackToolbar.setNavigationOnClickListener { finish() }
@@ -175,7 +172,7 @@ class TrackActivity : SimpleControllerActivity(), PlaybackSpeedListener {
         getTrackFromUri(intent.data) { track ->
             runOnUiThread {
                 if (track != null) {
-                    prepareAndPlay(listOf(track), startActivity = false)
+                    prepareAndPlay(listOf(track), startActivity = false, playNow = true)
                 } else {
                     toast(org.fossify.commons.R.string.unknown_error_occurred)
                     finish()
@@ -185,7 +182,8 @@ class TrackActivity : SimpleControllerActivity(), PlaybackSpeedListener {
     }
 
     private fun setupButtons() = binding.apply {
-        activityTrackToggleShuffle.setOnClickListener { withPlayer { toggleShuffle() } }
+        activityTrackToggleShuffle.setOnClickListener { shuffleQueue() }
+        activityTrackToggleShuffle.setOnLongClickListener { undoShuffle() }
         activityTrackPrevious.setOnClickListener { seekToPrevious() }
         activityTrackPlayPause.setOnClickListener { togglePlayback() }
         activityTrackNext.setOnClickListener { seekToNext() }
@@ -193,8 +191,6 @@ class TrackActivity : SimpleControllerActivity(), PlaybackSpeedListener {
         activityTrackProgressMax.setOnClickListener { seekForward() }
         activityTrackPlaybackSetting.setOnClickListener { togglePlaybackSetting() }
         activityTrackSpeedClickArea.setOnClickListener { showPlaybackSpeedPicker() }
-        setupShuffleButton()
-        setupPlaybackSettingButton()
         setupSeekbar()
 
         arrayOf(activityTrackPrevious, activityTrackPlayPause, activityTrackNext).forEach {
@@ -307,23 +303,42 @@ class TrackActivity : SimpleControllerActivity(), PlaybackSpeedListener {
         }
     }
 
-    private fun toggleShuffle() {
-        val isShuffleEnabled = !config.isShuffleEnabled
-        config.isShuffleEnabled = isShuffleEnabled
-        toast(if (isShuffleEnabled) R.string.shuffle_enabled else R.string.shuffle_disabled)
-        setupShuffleButton()
-        withPlayer {
-            shuffleModeEnabled = config.isShuffleEnabled
-            setupNextTrackInfo(nextMediaItem)
+    /** Shuffling is an action on the queue, not a playback mode. */
+    private fun shuffleQueue() {
+        PlaybackService.queueController?.post { shuffleUpcoming() }
+        toast(R.string.queue_shuffled)
+    }
+
+    private fun undoShuffle(): Boolean {
+        val queue = PlaybackService.queueController ?: return false
+        if (PlaybackService.queueState.value?.canUndoReorder != true) {
+            return false
+        }
+
+        queue.post { undoReorder() }
+        return true
+    }
+
+    private fun renderQueueState(state: QueueState?) {
+        setupShuffleButton(state?.canUndoReorder == true)
+        setupPlaybackSettingButton(state?.toPlaybackSetting() ?: PlaybackSetting.REPEAT_OFF)
+    }
+
+    private fun QueueState.toPlaybackSetting(): PlaybackSetting {
+        val head = head ?: return PlaybackSetting.REPEAT_OFF
+        return when {
+            head.isInfinite -> PlaybackSetting.REPEAT_TRACK
+            afterHead.firstOrNull() is QueueEntry.PauseMarker -> PlaybackSetting.STOP_AFTER_CURRENT_TRACK
+            else -> PlaybackSetting.REPEAT_OFF
         }
     }
 
-    private fun setupShuffleButton(isShuffleEnabled: Boolean = config.isShuffleEnabled) {
+    /** Highlighted while the last shuffle can still be undone (long press). */
+    private fun setupShuffleButton(canUndo: Boolean) {
         binding.activityTrackToggleShuffle.apply {
-            applyColorFilter(if (isShuffleEnabled) getProperPrimaryColor() else getProperTextColor())
-            alpha = if (isShuffleEnabled) 1f else MEDIUM_ALPHA
-            contentDescription =
-                getString(if (isShuffleEnabled) R.string.disable_shuffle else R.string.enable_shuffle)
+            applyColorFilter(if (canUndo) getProperPrimaryColor() else getProperTextColor())
+            alpha = if (canUndo) 1f else MEDIUM_ALPHA
+            contentDescription = getString(R.string.shuffle_queue)
         }
     }
 
@@ -337,23 +352,32 @@ class TrackActivity : SimpleControllerActivity(), PlaybackSpeedListener {
         withPlayer { seekForward() }
     }
 
+    /**
+     * Repeat and "stop after this track" are properties of the queue: repeating forever is the repeat count of
+     * the current entry, and stopping is a pause marker right behind it.
+     */
     private fun togglePlaybackSetting() {
-        val newPlaybackSetting = config.playbackSetting.nextPlaybackOption
-        config.playbackSetting = newPlaybackSetting
-        toast(newPlaybackSetting.descriptionStringRes)
-        setupPlaybackSettingButton()
-        withPlayer {
-            setRepeatMode(newPlaybackSetting)
+        val queue = PlaybackService.queueController ?: return
+        val state = PlaybackService.queueState.value ?: return
+        val head = state.head ?: return
+        val marker = state.afterHead.firstOrNull() as? QueueEntry.PauseMarker
+        val next = state.toPlaybackSetting().nextPlaybackOption
+        toast(next.descriptionStringRes)
+
+        queue.post {
+            when (next) {
+                PlaybackSetting.REPEAT_TRACK -> setRepeatCount(head.id, null)
+                PlaybackSetting.STOP_AFTER_CURRENT_TRACK -> {
+                    setRepeatCount(head.id, 1)
+                    insertPauseMarker(head.id)
+                }
+
+                PlaybackSetting.REPEAT_OFF -> marker?.let { removeEntries(listOf(it.id)) }
+            }
         }
     }
 
-    private fun maybeUpdatePlaybackSettingButton(playbackSetting: PlaybackSetting) {
-        if (config.playbackSetting != PlaybackSetting.STOP_AFTER_CURRENT_TRACK) {
-            setupPlaybackSettingButton(playbackSetting)
-        }
-    }
-
-    private fun setupPlaybackSettingButton(playbackSetting: PlaybackSetting = config.playbackSetting) {
+    private fun setupPlaybackSettingButton(playbackSetting: PlaybackSetting) {
         binding.activityTrackPlaybackSetting.apply {
             contentDescription = getString(playbackSetting.contentDescriptionStringRes)
             setImageResource(playbackSetting.iconRes)
@@ -417,14 +441,6 @@ class TrackActivity : SimpleControllerActivity(), PlaybackSpeedListener {
 
     override fun onIsPlayingChanged(isPlaying: Boolean) = updatePlayerState()
 
-    override fun onRepeatModeChanged(repeatMode: Int) {
-        maybeUpdatePlaybackSettingButton(getPlaybackSetting(repeatMode))
-    }
-
-    override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {
-        setupShuffleButton(shuffleModeEnabled)
-    }
-
     override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
         super.onMediaItemTransition(mediaItem, reason)
         if (mediaItem == null) {
@@ -453,8 +469,6 @@ class TrackActivity : SimpleControllerActivity(), PlaybackSpeedListener {
 
             updateProgress(currentPosition)
             updatePlayPause(isPlaying)
-            setupShuffleButton(shuffleModeEnabled)
-            maybeUpdatePlaybackSettingButton(getPlaybackSetting(repeatMode))
         }
     }
 
@@ -482,56 +496,8 @@ class TrackActivity : SimpleControllerActivity(), PlaybackSpeedListener {
         binding.activityTrackPlayPause.updatePlayPauseIcon(isPlaying, getProperTextColor())
     }
 
-    private fun seekToNext() {
-        seekCount += 1
-        seekWithDelay()
-    }
+    // Navigation is decided by the queue (see SimpleMusicPlayer), including restarting the track on "previous".
+    private fun seekToNext() = withPlayer { seekToNext() }
 
-    private fun seekToPrevious() {
-        withPlayer {
-            if (maybeRestartOnPrevious()) return@withPlayer
-            seekCount -= 1
-            seekWithDelay()
-        }
-    }
-
-    /**
-     * This is here so the player can quickly seek next/previous without doing too much work.
-     * It probably won't be needed once https://github.com/androidx/media/issues/81 is resolved.
-     */
-    private fun seekWithDelay() {
-        seekJob?.cancel()
-        seekJob = scope.launch {
-            delay(timeMillis = SEEK_COALESCE_INTERVAL_MS)
-            if (seekCount != 0) {
-                seekByCount(seekCount)
-            }
-        }
-    }
-
-    private fun seekByCount(count: Int) {
-        withPlayer {
-            if (currentMediaItem == null) {
-                return@withPlayer
-            }
-
-            val currentIndex = currentMediaItemIndex
-            val mediaItemCount = mediaItemCount
-            val seekIndex = if (shuffleModeEnabled) {
-                val shuffledIndex = shuffledMediaItemsIndices.indexOf(currentIndex)
-                val seekIndex = rotateIndex(mediaItemCount, shuffledIndex + count)
-                shuffledMediaItemsIndices.getOrNull(seekIndex) ?: return@withPlayer
-            } else {
-                rotateIndex(mediaItemCount, currentIndex + count)
-            }
-
-            play()
-            seekTo(seekIndex, 0)
-            seekCount = 0
-        }
-    }
-
-    private fun rotateIndex(total: Int, index: Int): Int {
-        return (index % total + total) % total
-    }
+    private fun seekToPrevious() = withPlayer { seekToPrevious() }
 }

@@ -4,20 +4,18 @@ import android.content.ContentUris
 import android.content.Intent
 import android.os.Bundle
 import android.provider.MediaStore
-import androidx.core.os.bundleOf
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import org.fossify.commons.extensions.toast
 import org.fossify.commons.helpers.ensureBackgroundThread
 import org.fossify.commons.helpers.isRPlus
+import org.fossify.musicplayer.R
 import org.fossify.musicplayer.extensions.*
-import org.fossify.musicplayer.helpers.EXTRA_NEXT_MEDIA_ID
 import org.fossify.musicplayer.helpers.SimpleMediaController
 import org.fossify.musicplayer.models.Events
 import org.fossify.musicplayer.models.Track
-import org.fossify.musicplayer.models.toMediaItems
-import org.fossify.musicplayer.playback.CustomCommands
-import org.fossify.musicplayer.playback.PlaybackService.Companion.updatePlaybackInfo
+import org.fossify.musicplayer.playback.PlaybackService
+import org.fossify.musicplayer.playback.queue.InsertPosition
 import org.greenrobot.eventbus.EventBus
 import java.io.File
 
@@ -52,17 +50,31 @@ abstract class SimpleControllerActivity : SimpleActivity(), Player.Listener {
 
     fun withPlayer(callback: MediaController.() -> Unit) = controller.withController(callback)
 
-    fun prepareAndPlay(tracks: List<Track>, startIndex: Int = 0, startPositionMs: Long = 0, startActivity: Boolean = true) {
+    /**
+     * Clicking a track adds it to the queue, and playback starts if the queue was empty. With [playNow] the track
+     * is queued right after the current one and played immediately (e.g. a file opened from another app).
+     */
+    fun prepareAndPlay(
+        tracks: List<Track>,
+        startIndex: Int = 0,
+        startPositionMs: Long = 0,
+        startActivity: Boolean = true,
+        playNow: Boolean = false,
+    ) {
+        val track = tracks.getOrNull(startIndex) ?: return
         withPlayer {
-            if (startActivity) {
-                startActivity(
-                    Intent(this@SimpleControllerActivity, TrackActivity::class.java)
-                )
+            val queue = PlaybackService.queueController ?: return@withPlayer
+            val wasEmpty = PlaybackService.queueState.value?.isQueueEmpty != false
+            if (startActivity && (wasEmpty || playNow)) {
+                startActivity(Intent(this@SimpleControllerActivity, TrackActivity::class.java))
             }
 
-            prepareUsingTracks(tracks = tracks, startIndex = startIndex, startPositionMs = startPositionMs, play = true) { success ->
-                if (success) {
-                    updatePlaybackInfo(this)
+            if (playNow) {
+                queue.playNow(listOf(track))
+            } else {
+                queue.addTracks(listOf(track), startIfEmpty = true)
+                if (!wasEmpty) {
+                    toast(R.string.added_to_queue)
                 }
             }
         }
@@ -78,60 +90,20 @@ abstract class SimpleControllerActivity : SimpleActivity(), Player.Listener {
 
     fun addTracksToQueue(tracks: List<Track>, callback: () -> Unit) {
         withPlayer {
-            val currentMediaItemsIds = currentMediaItems.map { it.mediaId }
-            val mediaItems = tracks.toMediaItems().filter { it.mediaId !in currentMediaItemsIds }
-            addMediaItems(mediaItems)
+            PlaybackService.queueController?.addTracks(tracks)
             callback()
-        }
-    }
-
-    fun removeQueueItems(tracks: List<Track>, callback: (() -> Unit)? = null) {
-        withPlayer {
-            var currentItemChanged = false
-            tracks.forEach {
-                val index = currentMediaItems.indexOfTrackOrNull(it)
-                if (index != null) {
-                    currentItemChanged = index == currentMediaItemIndex
-                    removeMediaItem(index)
-                }
-            }
-
-            if (currentItemChanged) {
-                updatePlaybackInfo(this)
-            }
-
-            callback?.invoke()
         }
     }
 
     fun playNextInQueue(track: Track, callback: () -> Unit) {
         withPlayer {
-            sendCommand(
-                command = CustomCommands.SET_NEXT_ITEM,
-                extras = bundleOf(EXTRA_NEXT_MEDIA_ID to track.mediaStoreId.toString())
-            )
+            PlaybackService.queueController?.addTracks(listOf(track), where = InsertPosition.PlayNext)
             callback()
         }
     }
 
-    fun refreshQueueAndTracks(trackToUpdate: Track? = null) {
-        ensureBackgroundThread {
-            val queuedTracks = audioHelper.getQueuedTracks()
-            runOnUiThread {
-                withPlayer {
-                    // it's not yet directly possible to update metadata without interrupting the playback: https://github.com/androidx/media/issues/33
-                    if (trackToUpdate == null || currentMediaItem.isSameMedia(trackToUpdate)) {
-                        prepareUsingTracks(tracks = queuedTracks, startIndex = currentMediaItemIndex, startPositionMs = currentPosition, play = isReallyPlaying)
-                    } else {
-                        val trackIndex = currentMediaItems.indexOfTrack(trackToUpdate)
-                        if (trackIndex > 0) {
-                            removeMediaItem(trackIndex)
-                            addMediaItem(trackIndex, trackToUpdate.toMediaItem())
-                        }
-                    }
-                }
-            }
-        }
+    fun refreshQueueAndTracks(@Suppress("UNUSED_PARAMETER") trackToUpdate: Track? = null) {
+        PlaybackService.queueController?.refreshTracks()
 
         EventBus.getDefault().post(Events.RefreshTracks())
     }
