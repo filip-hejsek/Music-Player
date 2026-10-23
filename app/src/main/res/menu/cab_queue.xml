@@ -25,4 +25,14 @@
         android:showAsAction="never"
         android:title="@string/add_to_playlist"
         app:showAsAction="never" />
+    <item
+        android:id="@+id/cab_pause_after"
+        android:showAsAction="never"
+        android:title="@string/queue_pause_after_this"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/cab_set_repeat"
+        android:showAsAction="never"
+        android:title="@string/queue_set_repeat_count"
+        app:showAsAction="never" />
 </menu>
