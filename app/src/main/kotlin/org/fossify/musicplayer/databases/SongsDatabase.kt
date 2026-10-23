@@ -16,7 +16,7 @@ import org.fossify.musicplayer.playback.queue.QueueGroupRow
 
 @Database(
     entities = [
-        Track::class, Playlist::class, QueueItem::class, Artist::class, Album::class, Genre::class,
+        Track::class, Playlist::class, Artist::class, Album::class, Genre::class,
         QueueEntryRow::class, QueueGroupRow::class, PlaybackCursorRow::class,
     ],
     version = 16
@@ -26,8 +26,6 @@ abstract class SongsDatabase : RoomDatabase() {
     abstract fun SongsDao(): SongsDao
 
     abstract fun PlaylistsDao(): PlaylistsDao
-
-    abstract fun QueueItemsDao(): QueueItemsDao
 
     abstract fun QueueDao(): QueueDao
 
@@ -250,10 +248,6 @@ abstract class SongsDatabase : RoomDatabase() {
          * Adds the logical queue tables and converts the old `queue_items` queue into them, so the queue
          * survives the update.
          *
-         * `queue_items` is deliberately *not* dropped yet: the playback code still reads and writes it
-         * until it is rewired to the new queue. Drop it (here, if this was never released, or in a
-         * 16 -> 17 migration) together with `QueueItem`/`QueueItemsDao` when that happens.
-         *
          * The old queue is stored in unshuffled timeline order, so a shuffled order is not preserved.
          */
         private val MIGRATION_15_16 = object : Migration(15, 16) {
@@ -282,6 +276,8 @@ abstract class SongsDatabase : RoomDatabase() {
                             "COALESCE((SELECT last_position > 0 FROM queue_items WHERE is_current = 1 LIMIT 1), 0), " +
                             "COALESCE((SELECT last_position * 1000 FROM queue_items WHERE is_current = 1 LIMIT 1), 0))"
                     )
+
+                    execSQL("DROP TABLE queue_items")
                 }
             }
         }

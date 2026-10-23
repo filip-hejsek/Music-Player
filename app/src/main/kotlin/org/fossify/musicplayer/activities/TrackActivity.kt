@@ -49,7 +49,6 @@ import org.fossify.musicplayer.extensions.isReallyPlaying
 import org.fossify.musicplayer.extensions.loadGlideResource
 import org.fossify.musicplayer.extensions.nextMediaItem
 import org.fossify.musicplayer.extensions.sendCommand
-import org.fossify.musicplayer.extensions.toMediaItem
 import org.fossify.musicplayer.extensions.toTrack
 import org.fossify.musicplayer.extensions.updatePlayPauseIcon
 import org.fossify.musicplayer.fragments.PlaybackSpeedFragment

@@ -1,14 +1,10 @@
 package org.fossify.musicplayer.activities
 
-import android.content.ContentUris
 import android.content.Intent
 import android.os.Bundle
-import android.provider.MediaStore
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import org.fossify.commons.extensions.toast
-import org.fossify.commons.helpers.ensureBackgroundThread
-import org.fossify.commons.helpers.isRPlus
 import org.fossify.musicplayer.R
 import org.fossify.musicplayer.extensions.*
 import org.fossify.musicplayer.helpers.SimpleMediaController
@@ -17,7 +13,6 @@ import org.fossify.musicplayer.models.Track
 import org.fossify.musicplayer.playback.PlaybackService
 import org.fossify.musicplayer.playback.queue.InsertPosition
 import org.greenrobot.eventbus.EventBus
-import java.io.File
 
 /**
  * Base class for activities that want to control the [Player].

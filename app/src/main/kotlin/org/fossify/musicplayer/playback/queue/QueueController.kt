@@ -155,7 +155,7 @@ class QueueController(
     // region intents from the UI
 
     /** Runs [block] on the queue's (player) thread. */
-    fun run(block: suspend QueueController.() -> Unit) {
+    fun launchOnQueue(block: suspend QueueController.() -> Unit) {
         scope.launch { block() }
     }
 
