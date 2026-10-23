@@ -6,10 +6,8 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import org.fossify.commons.extensions.toast
-import org.fossify.musicplayer.extensions.config
-import org.fossify.musicplayer.extensions.getPlaybackSetting
-import org.fossify.musicplayer.helpers.PlaybackSetting
 import org.fossify.musicplayer.playback.PlaybackService
+import org.fossify.musicplayer.playback.PlaybackService.Companion.queueController
 
 @UnstableApi
 internal fun PlaybackService.getPlayerListener() = object : Player.Listener {
@@ -32,25 +30,28 @@ internal fun PlaybackService.getPlayerListener() = object : Player.Listener {
         }
     }
 
+    /**
+     * The player moved on to the next physical item by itself (or repeated the current one): the logical queue
+     * has to catch up. Transitions we caused ourselves (rebuilding the timeline, seeking) are not "finished tracks".
+     */
     override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-        // customize repeat mode behaviour as the default behaviour doesn't align with our requirements.
-        withPlayer {
-            if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT) {
-                if (config.playbackSetting == PlaybackSetting.STOP_AFTER_CURRENT_TRACK) {
-                    seekTo(0)
-                    pause()
-                }
-            }
+        if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO || reason == Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT) {
+            queueController?.onTrackFinished()
         }
     }
 
-    override fun onRepeatModeChanged(repeatMode: Int) {
-        if (config.playbackSetting != PlaybackSetting.STOP_AFTER_CURRENT_TRACK) {
-            config.playbackSetting = getPlaybackSetting(repeatMode)
+    /**
+     * The timeline ends at a pause marker and at the end of the queue, where the player has no next item.
+     */
+    override fun onPlaybackStateChanged(playbackState: Int) {
+        if (playbackState == Player.STATE_ENDED) {
+            queueController?.onTrackFinished()
         }
     }
 
-    override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {
-        config.isShuffleEnabled = shuffleModeEnabled
+    override fun onIsPlayingChanged(isPlaying: Boolean) {
+        if (!isPlaying) {
+            queueController?.savePositionNow()
+        }
     }
 }

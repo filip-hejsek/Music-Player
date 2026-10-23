@@ -79,6 +79,9 @@
     <string name="play_next">Play next</string>
     <string name="remove_from_queue">Remove from queue</string>
     <string name="create_playlist_from_queue">Create playlist from queue</string>
+    <string name="added_to_queue">Added to queue</string>
+    <string name="queue_shuffled">Queue shuffled (long press to undo)</string>
+    <string name="queue_pause_not_possible">A pause marker can\'t be placed there</string>
     <string name="queue_pause_here">Pause here</string>
     <string name="queue_added_together">Added together</string>
     <string name="queue_pause_after_this">Pause after this track</string>

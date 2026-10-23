@@ -69,6 +69,12 @@ data class QueueState(
     /** Nothing is active and nothing is waiting to be played. */
     val isQueueEmpty: Boolean get() = current == null && upcoming.isEmpty()
 
+    /** The entry that is playing, or that will play next. */
+    val head: QueueEntry.TrackEntry? get() = current ?: upcoming.firstOrNull() as? QueueEntry.TrackEntry
+
+    /** Everything that follows the head. */
+    val afterHead: List<QueueEntry> get() = if (current != null) upcoming else upcoming.drop(1)
+
     /** History, then the active entry, then upcoming - in list order. */
     val allEntries: List<QueueEntry>
         get() = history + listOfNotNull(current) + upcoming

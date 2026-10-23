@@ -16,10 +16,8 @@ import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.MoreExecutors
 import com.google.common.util.concurrent.SettableFuture
-import org.fossify.musicplayer.extensions.addRemainingMediaItems
-import org.fossify.musicplayer.helpers.EXTRA_NEXT_MEDIA_ID
-import org.fossify.musicplayer.helpers.EXTRA_SHUFFLE_INDICES
-import org.fossify.musicplayer.playback.player.updatePlaybackState
+import org.fossify.musicplayer.extensions.toTracks
+import org.fossify.musicplayer.playback.PlaybackService.Companion.queueController
 import java.util.concurrent.Executors
 
 @UnstableApi
@@ -79,8 +77,6 @@ internal fun PlaybackService.getMediaSessionCallback() = object : MediaLibrarySe
             CustomCommands.CLOSE_PLAYER -> stopService()
             CustomCommands.RELOAD_CONTENT -> reloadContent()
             CustomCommands.TOGGLE_SLEEP_TIMER -> toggleSleepTimer()
-            CustomCommands.SET_SHUFFLE_ORDER -> setShuffleOrder(args)
-            CustomCommands.SET_NEXT_ITEM -> setNextItem(args)
         }
 
         return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
@@ -151,22 +147,24 @@ internal fun PlaybackService.getMediaSessionCallback() = object : MediaLibrarySe
         controller: MediaSession.ControllerInfo
     ): ListenableFuture<MediaSession.MediaItemsWithStartPosition> {
         val settableFuture = SettableFuture.create<MediaSession.MediaItemsWithStartPosition>()
-        executorService.execute {
-            var futureSet = false
-            mediaItemProvider.getRecentItemsLazily {
-                // resume playback as quickly as possible: https://github.com/androidx/media/issues/111
-                if (!futureSet) {
-                    settableFuture.set(it)
-                    futureSet = true
-                } else {
-                    player.addRemainingMediaItems(it.mediaItems, it.startIndex)
-                }
+        val queue = queueController
+        if (queue == null) {
+            settableFuture.set(MediaSession.MediaItemsWithStartPosition(emptyList(), 0, 0))
+        } else {
+            queue.run {
+                val (items, startPositionMs) = resumptionTimeline()
+                settableFuture.set(MediaSession.MediaItemsWithStartPosition(items, 0, startPositionMs))
             }
         }
 
         return settableFuture
     }
 
+    /**
+     * Controllers that bring their own queue (Android Auto, assistants) don't get to replace the timeline:
+     * their items are queued right after the current entry and the first of them starts playing, and the
+     * session is handed the timeline derived from the logical queue.
+     */
     override fun onSetMediaItems(
         mediaSession: MediaSession,
         controller: MediaSession.ControllerInfo,
@@ -174,23 +172,30 @@ internal fun PlaybackService.getMediaSessionCallback() = object : MediaLibrarySe
         startIndex: Int,
         startPositionMs: Long
     ): ListenableFuture<MediaSession.MediaItemsWithStartPosition> {
-        if (controller.packageName == packageName) {
-            return super.onSetMediaItems(mediaSession, controller, mediaItems, startIndex, startPositionMs)
+        val queue = queueController
+            ?: return Futures.immediateFuture(MediaSession.MediaItemsWithStartPosition(emptyList(), 0, 0))
+
+        val settableFuture = SettableFuture.create<MediaSession.MediaItemsWithStartPosition>()
+        callWhenSourceReady {
+            // this is to avoid single items in the queue: https://github.com/androidx/media/issues/156
+            val resolved = mediaItems.map { mediaItemProvider[it.mediaId] ?: it }
+            val startItemId = resolved.getOrNull(startIndex)?.mediaId ?: resolved.firstOrNull()?.mediaId
+            val currentItems = mediaItemProvider.getChildren(currentRoot).orEmpty()
+            val queueItems = when {
+                resolved.size > 1 -> resolved
+                currentItems.any { it.mediaId == startItemId } -> currentItems
+                else -> mediaItemProvider.getDefaultQueue() ?: resolved
+            }
+
+            val tracks = queueItems.toTracks()
+            val startTrackIndex = queueItems.indexOfFirst { it.mediaId == startItemId }.coerceAtLeast(0)
+            queue.run {
+                val items = playTracksNow(tracks, startTrackIndex)
+                settableFuture.set(MediaSession.MediaItemsWithStartPosition(items, 0, startPositionMs.coerceAtLeast(0)))
+            }
         }
 
-        // this is to avoid single items in the queue: https://github.com/androidx/media/issues/156
-        var queueItems = mediaItems
-        val startItemId = mediaItems[0].mediaId
-        val currentItems = mediaItemProvider.getChildren(currentRoot).orEmpty()
-
-        queueItems = if (currentItems.any { it.mediaId == startItemId }) {
-            currentItems.toMutableList()
-        } else {
-            mediaItemProvider.getDefaultQueue()?.toMutableList() ?: queueItems
-        }
-
-        val startItemIndex = queueItems.indexOfFirst { it.mediaId == startItemId }
-        return super.onSetMediaItems(mediaSession, controller, queueItems, startItemIndex, startPositionMs)
+        return settableFuture
     }
 
     override fun onAddMediaItems(
@@ -226,24 +231,6 @@ internal fun PlaybackService.getMediaSessionCallback() = object : MediaLibrarySe
                     mediaSession.notifyChildrenChanged(browser, parentId, itemCount, null)
                     mediaSession.notifyChildrenChanged(browser, rootItem.mediaId, rootItemCount, null)
                 }
-            }
-        }
-    }
-
-    private fun setShuffleOrder(args: Bundle) {
-        val indices = args.getIntArray(EXTRA_SHUFFLE_INDICES) ?: return
-        withPlayer {
-            setShuffleIndices(indices)
-        }
-    }
-
-    private fun setNextItem(args: Bundle) {
-        val mediaId = args.getString(EXTRA_NEXT_MEDIA_ID) ?: return
-        callWhenSourceReady {
-            val mediaItem = mediaItemProvider[mediaId] ?: return@callWhenSourceReady
-            withPlayer {
-                setNextMediaItem(mediaItem)
-                updatePlaybackState()
             }
         }
     }
