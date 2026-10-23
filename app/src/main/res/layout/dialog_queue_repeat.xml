@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/queue_repeat_dialog_holder"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingLeft="@dimen/activity_margin"
+    android:paddingTop="@dimen/activity_margin"
+    android:paddingRight="@dimen/activity_margin">
+
+    <org.fossify.commons.views.MyTextInputLayout
+        android:id="@+id/queue_repeat_count_hint"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="@string/queue_repeat_count">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/queue_repeat_count"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="number"
+            android:maxLength="4"
+            android:singleLine="true"
+            android:textCursorDrawable="@null"
+            android:textSize="@dimen/normal_text_size" />
+
+    </org.fossify.commons.views.MyTextInputLayout>
+
+    <org.fossify.commons.views.MyAppCompatCheckbox
+        android:id="@+id/queue_repeat_forever"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="@dimen/activity_margin"
+        android:paddingTop="@dimen/medium_margin"
+        android:paddingBottom="@dimen/medium_margin"
+        android:text="@string/queue_repeat_forever" />
+
+</LinearLayout>

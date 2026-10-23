@@ -79,6 +79,22 @@
     <string name="play_next">Play next</string>
     <string name="remove_from_queue">Remove from queue</string>
     <string name="create_playlist_from_queue">Create playlist from queue</string>
+    <string name="queue_pause_here">Pause here</string>
+    <string name="queue_added_together">Added together</string>
+    <string name="queue_pause_after_this">Pause after this track</string>
+    <string name="queue_set_repeat_count">Set repeat count</string>
+    <string name="queue_repeat_count">Number of times to play</string>
+    <string name="queue_repeat_forever">Repeat forever</string>
+    <string name="queue_invalid_repeat_count">Enter a number of at least 1</string>
+    <string name="shuffle_queue">Shuffle queue</string>
+    <string name="shuffle_group">Shuffle group</string>
+    <string name="sort_queue_by_album">Sort by album</string>
+    <string name="undo_queue_reorder">Undo shuffle / sort</string>
+    <string name="remove_group_from_queue">Remove group from queue</string>
+    <string name="clear_queue">Clear queue</string>
+    <string name="clear_queue_history">Clear history</string>
+    <string name="clear_queue_confirmation">Remove all upcoming tracks from the queue?</string>
+    <string name="clear_queue_history_confirmation">Clear the playback history?</string>
     <!-- Settings -->
     <string name="equalizer">Equalizer</string>
     <string name="swap_prev_next">Swap previous/next headphone buttons</string>

@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/queue_pause_frame"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="@dimen/tiny_margin"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingStart="@dimen/normal_margin"
+    android:paddingTop="@dimen/medium_margin"
+    android:paddingEnd="@dimen/medium_margin"
+    android:paddingBottom="@dimen/medium_margin">
+
+    <ImageView
+        android:id="@+id/queue_pause_icon"
+        android:layout_width="@dimen/song_image_size"
+        android:layout_height="wrap_content"
+        android:padding="@dimen/small_margin"
+        android:src="@drawable/ic_queue_pause_vector"
+        tools:ignore="ContentDescription" />
+
+    <org.fossify.commons.views.MyTextView
+        android:id="@+id/queue_pause_title"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:paddingStart="@dimen/normal_margin"
+        android:text="@string/queue_pause_here"
+        android:textSize="@dimen/bigger_text_size"
+        android:textStyle="italic" />
+
+</LinearLayout>

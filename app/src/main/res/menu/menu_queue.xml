@@ -14,4 +14,29 @@
         android:showAsAction="never"
         android:title="@string/create_playlist_from_queue"
         app:showAsAction="never" />
+    <item
+        android:id="@+id/shuffle_queue"
+        android:showAsAction="never"
+        android:title="@string/shuffle_queue"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/sort_queue_by_album"
+        android:showAsAction="never"
+        android:title="@string/sort_queue_by_album"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/undo_queue_reorder"
+        android:showAsAction="never"
+        android:title="@string/undo_queue_reorder"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/clear_queue"
+        android:showAsAction="never"
+        android:title="@string/clear_queue"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/clear_queue_history"
+        android:showAsAction="never"
+        android:title="@string/clear_queue_history"
+        app:showAsAction="never" />
 </menu>
