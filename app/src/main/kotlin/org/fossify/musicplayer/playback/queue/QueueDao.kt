@@ -30,7 +30,7 @@ data class QueueMutation(
  */
 @Dao
 abstract class QueueDao {
-    @Query("SELECT * FROM queue_entries ORDER BY position")
+    @Query("SELECT * FROM queue_entries ORDER BY position, id")
     abstract suspend fun getAll(): List<QueueEntryRow>
 
     @Query("SELECT * FROM queue_groups")
