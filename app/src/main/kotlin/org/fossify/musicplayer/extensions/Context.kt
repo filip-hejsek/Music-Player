@@ -30,6 +30,7 @@ import org.fossify.musicplayer.models.Album
 import org.fossify.musicplayer.models.Artist
 import org.fossify.musicplayer.models.Genre
 import org.fossify.musicplayer.models.Track
+import org.fossify.musicplayer.playback.queue.QueueDao
 import java.io.File
 
 val Context.config: Config get() = Config.newInstance(applicationContext)
@@ -39,6 +40,8 @@ val Context.playlistDAO: PlaylistsDao get() = getTracksDB().PlaylistsDao()
 val Context.tracksDAO: SongsDao get() = getTracksDB().SongsDao()
 
 val Context.queueDAO: QueueItemsDao get() = getTracksDB().QueueItemsDao()
+
+val Context.queueEntriesDAO: QueueDao get() = getTracksDB().QueueDao()
 
 val Context.artistDAO: ArtistsDao get() = getTracksDB().ArtistsDao()
 

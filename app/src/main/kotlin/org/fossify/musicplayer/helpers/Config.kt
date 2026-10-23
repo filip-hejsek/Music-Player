@@ -16,6 +16,11 @@ class Config(context: Context) : BaseConfig(context) {
         get() = PlaybackSetting.values()[prefs.getInt(PLAYBACK_SETTING, PlaybackSetting.REPEAT_OFF.ordinal)]
         set(playbackSetting) = prefs.edit().putInt(PLAYBACK_SETTING, playbackSetting.ordinal).apply()
 
+    /** Maximum number of entries kept in the queue history; the oldest are pruned as playback advances. */
+    var historyCap: Int
+        get() = prefs.getInt(HISTORY_CAP, DEFAULT_HISTORY_CAP)
+        set(value) = prefs.edit().putInt(HISTORY_CAP, value).apply()
+
     var autoplay: Boolean
         get() = prefs.getBoolean(AUTOPLAY, true)
         set(autoplay) = prefs.edit().putBoolean(AUTOPLAY, autoplay).apply()

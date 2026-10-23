@@ -9,8 +9,18 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import org.fossify.musicplayer.interfaces.*
 import org.fossify.musicplayer.models.*
 import org.fossify.musicplayer.objects.MyExecutor
+import org.fossify.musicplayer.playback.queue.PlaybackCursorRow
+import org.fossify.musicplayer.playback.queue.QueueDao
+import org.fossify.musicplayer.playback.queue.QueueEntryRow
+import org.fossify.musicplayer.playback.queue.QueueGroupRow
 
-@Database(entities = [Track::class, Playlist::class, QueueItem::class, Artist::class, Album::class, Genre::class], version = 15)
+@Database(
+    entities = [
+        Track::class, Playlist::class, QueueItem::class, Artist::class, Album::class, Genre::class,
+        QueueEntryRow::class, QueueGroupRow::class, PlaybackCursorRow::class,
+    ],
+    version = 16
+)
 abstract class SongsDatabase : RoomDatabase() {
 
     abstract fun SongsDao(): SongsDao
@@ -18,6 +28,8 @@ abstract class SongsDatabase : RoomDatabase() {
     abstract fun PlaylistsDao(): PlaylistsDao
 
     abstract fun QueueItemsDao(): QueueItemsDao
+
+    abstract fun QueueDao(): QueueDao
 
     abstract fun ArtistsDao(): ArtistsDao
 
