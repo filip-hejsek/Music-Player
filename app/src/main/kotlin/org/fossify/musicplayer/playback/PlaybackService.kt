@@ -10,16 +10,30 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.MediaLibraryService
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.fossify.commons.extensions.hasPermission
 import org.fossify.commons.extensions.showErrorToast
+import org.fossify.musicplayer.extensions.audioHelper
+import org.fossify.musicplayer.extensions.config
 import org.fossify.musicplayer.extensions.isReallyPlaying
 import org.fossify.musicplayer.extensions.nextMediaItem
+import org.fossify.musicplayer.extensions.queueEntriesDAO
 import org.fossify.musicplayer.extensions.runOnPlayerThread
 import org.fossify.musicplayer.helpers.NotificationHelper
 import org.fossify.musicplayer.helpers.getPermissionToRequest
 import org.fossify.musicplayer.playback.library.MediaItemProvider
 import org.fossify.musicplayer.playback.player.SimpleMusicPlayer
 import org.fossify.musicplayer.playback.player.initializeSessionAndPlayer
+import org.fossify.musicplayer.playback.queue.QueueManager
+import org.fossify.musicplayer.playback.queue.QueueState
 
 @OptIn(UnstableApi::class)
 class PlaybackService : MediaLibraryService(), MediaSessionService.Listener {
@@ -30,11 +44,15 @@ class PlaybackService : MediaLibraryService(), MediaSessionService.Listener {
 
     internal var currentRoot = ""
 
+    // TODO: once the timeline materializer exists, run the manager on the player thread instead.
+    private val queueScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
     override fun onCreate() {
         super.onCreate()
         setListener(this)
         initializeSessionAndPlayer(handleAudioFocus = true, handleAudioBecomingNoisy = true)
         initializeLibrary()
+        initializeQueue()
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo) = mediaSession
@@ -45,6 +63,8 @@ class PlaybackService : MediaLibraryService(), MediaSessionService.Listener {
         clearListener()
         stopSleepTimer()
         SimpleEqualizer.release()
+        queueManager = null
+        queueScope.cancel()
     }
 
     fun stopService() {
@@ -63,6 +83,20 @@ class PlaybackService : MediaLibraryService(), MediaSessionService.Listener {
         } else {
             showNoPermissionNotification()
         }
+    }
+
+    private fun initializeQueue() {
+        val manager = QueueManager(
+            dao = queueEntriesDAO,
+            // blocking Room queries, so keep them off the manager's coroutine thread
+            loadTracks = { withContext(Dispatchers.IO) { audioHelper.getAllTracks().associateBy { it.mediaStoreId } } },
+            stateFlow = _queueState,
+            historyCap = { config.historyCap },
+            scope = queueScope,
+        )
+
+        queueManager = manager
+        queueScope.launch { manager.load() }
     }
 
     private fun releaseMediaSession() {
@@ -106,6 +140,18 @@ class PlaybackService : MediaLibraryService(), MediaSessionService.Listener {
         var currentMediaItem: MediaItem? = null
             private set
         var nextMediaItem: MediaItem? = null
+            private set
+
+        private val _queueState = MutableStateFlow<QueueState?>(null)
+
+        /**
+         * The logical queue; `null` until it has been loaded from Room, which is different from an empty queue.
+         * The service doesn't declare a separate process, so UI and service share this.
+         */
+        val queueState: StateFlow<QueueState?> = _queueState.asStateFlow()
+
+        /** Set while the service is alive; UI dispatches queue intents through it. */
+        var queueManager: QueueManager? = null
             private set
 
         fun updatePlaybackInfo(player: Player) {

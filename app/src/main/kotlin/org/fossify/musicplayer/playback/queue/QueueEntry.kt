@@ -63,6 +63,8 @@ data class QueueState(
     val current: QueueEntry.TrackEntry?,
     val upcoming: List<QueueEntry>,
     val groups: Map<Long, QueueGroup> = emptyMap(),
+    /** The last shuffle/sort can still be reverted. */
+    val canUndoReorder: Boolean = false,
 ) {
     /** Nothing is active and nothing is waiting to be played. */
     val isQueueEmpty: Boolean get() = current == null && upcoming.isEmpty()
