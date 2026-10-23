@@ -11,7 +11,6 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.MediaMetadata.MediaType
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.session.MediaSession.MediaItemsWithStartPosition
 import com.google.common.util.concurrent.MoreExecutors
 import org.fossify.musicplayer.R
 import org.fossify.musicplayer.extensions.*
@@ -21,8 +20,6 @@ import org.fossify.musicplayer.helpers.TAB_FOLDERS
 import org.fossify.musicplayer.helpers.TAB_GENRES
 import org.fossify.musicplayer.helpers.TAB_PLAYLISTS
 import org.fossify.musicplayer.helpers.TAB_TRACKS
-import org.fossify.musicplayer.models.QueueItem
-import org.fossify.musicplayer.models.toMediaItems
 import java.util.concurrent.Executors
 
 private const val STATE_CREATED = 1
@@ -129,45 +126,6 @@ internal class MediaItemProvider(private val context: Context) {
 
     fun getDefaultQueue() = getChildren(SMP_TRACKS_ROOT_ID)
 
-    fun getRecentItemsLazily(callback: (itemsWithStartPosition: MediaItemsWithStartPosition) -> Unit) {
-        if (state == STATE_INITIALIZED) {
-            callback(getRecentItemsWithStartPosition())
-        } else {
-            audioHelper.getQueuedTracksLazily { tracks, startIndex, startPositionMs ->
-                callback(MediaItemsWithStartPosition(tracks.toMediaItems(), startIndex, startPositionMs))
-            }
-        }
-    }
-
-    fun getRecentItemsWithStartPosition(): MediaItemsWithStartPosition {
-        val recentItems = context.queueDAO.getAll().mapNotNull { getMediaItemFromQueueItem(it) }
-        var startPosition = 0L
-        val currentItem = context.queueDAO.getCurrent()?.let {
-            val mediaItem = getMediaItemFromQueueItem(it) ?: return@let null
-            val metadata = mediaItem.mediaMetadata.buildUpon().build()
-            startPosition = it.lastPosition * 1000L
-            mediaItem.buildUpon().setMediaMetadata(metadata).build()
-        }
-
-        val startIndex = maxOf(recentItems.indexOf(currentItem), 0)
-        return MediaItemsWithStartPosition(recentItems, startIndex, startPosition)
-    }
-
-    fun saveRecentItemsWithStartPosition(mediaItems: List<MediaItem>, current: MediaItem, startPosition: Long) {
-        if (mediaItems.isEmpty()) {
-            return
-        }
-
-        executor.execute {
-            val trackId = current.mediaId.toLong()
-            val queueItems = mediaItems.mapIndexed { index, mediaItem ->
-                QueueItem(trackId = mediaItem.mediaId.toLong(), trackOrder = index, isCurrent = false, lastPosition = 0)
-            }
-
-            audioHelper.resetQueue(queueItems, trackId, startPosition)
-        }
-    }
-
     fun reload() {
         state = STATE_INITIALIZING
         executor.execute {
@@ -250,8 +208,6 @@ internal class MediaItemProvider(private val context: Context) {
             getNode(parentId)?.addChild(item.mediaId)
         }
     }
-
-    private fun getMediaItemFromQueueItem(queueItem: QueueItem) = getNode(queueItem.trackId.toString())?.item
 }
 
 private enum class RootCategories(@StringRes val titleRes: Int, @DrawableRes val drawableRes: Int, val mediaId: String, val mediaType: @MediaType Int) {

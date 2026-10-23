@@ -13,7 +13,6 @@ import android.provider.MediaStore
 import android.provider.MediaStore.Audio
 import android.util.Size
 import androidx.core.net.toUri
-import androidx.media3.common.Player
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.DataSource
 import com.bumptech.glide.load.engine.GlideException
@@ -38,8 +37,6 @@ val Context.config: Config get() = Config.newInstance(applicationContext)
 val Context.playlistDAO: PlaylistsDao get() = getTracksDB().PlaylistsDao()
 
 val Context.tracksDAO: SongsDao get() = getTracksDB().SongsDao()
-
-val Context.queueDAO: QueueItemsDao get() = getTracksDB().QueueItemsDao()
 
 val Context.queueEntriesDAO: QueueDao get() = getTracksDB().QueueDao()
 
@@ -291,15 +288,6 @@ fun Context.getTrackFromUri(uri: Uri?, callback: (track: Track?) -> Unit) {
 fun Context.isTabVisible(flag: Int) = config.showTabs and flag != 0
 
 fun Context.getVisibleTabs() = tabsList.filter { isTabVisible(it) }
-
-fun Context.getPlaybackSetting(repeatMode: @Player.RepeatMode Int): PlaybackSetting {
-    return when (repeatMode) {
-        Player.REPEAT_MODE_OFF -> PlaybackSetting.REPEAT_OFF
-        Player.REPEAT_MODE_ONE -> PlaybackSetting.REPEAT_TRACK
-        Player.REPEAT_MODE_ALL -> PlaybackSetting.REPEAT_PLAYLIST
-        else -> config.playbackSetting
-    }
-}
 
 fun Context.getFriendlyFolder(path: String): String {
     return when (val parentPath = path.getParentPath()) {

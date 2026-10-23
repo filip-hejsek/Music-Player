@@ -103,16 +103,8 @@ data class Track(
     } else {
         ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, mediaStoreId)
     }
-
-    fun isCurrent() = flags and FLAG_IS_CURRENT != 0
 }
 
 fun ArrayList<Track>.sortSafely(sorting: Int) = sortSafely(Track.getComparator(sorting))
 
 fun Collection<Track>.toMediaItems() = map { it.toMediaItem() }
-
-fun Collection<Track>.toMediaItemsFast() = map {
-    MediaItem.Builder()
-        .setMediaId(it.mediaStoreId.toString())
-        .build()
-}

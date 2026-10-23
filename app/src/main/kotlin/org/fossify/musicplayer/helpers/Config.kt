@@ -8,14 +8,6 @@ class Config(context: Context) : BaseConfig(context) {
         fun newInstance(context: Context) = Config(context)
     }
 
-    var isShuffleEnabled: Boolean
-        get() = prefs.getBoolean(SHUFFLE, false)
-        set(shuffle) = prefs.edit().putBoolean(SHUFFLE, shuffle).apply()
-
-    var playbackSetting: PlaybackSetting
-        get() = PlaybackSetting.values()[prefs.getInt(PLAYBACK_SETTING, PlaybackSetting.REPEAT_OFF.ordinal)]
-        set(playbackSetting) = prefs.edit().putInt(PLAYBACK_SETTING, playbackSetting.ordinal).apply()
-
     /** Maximum number of entries kept in the queue history; the oldest are pruned as playback advances. */
     var historyCap: Int
         get() = prefs.getInt(HISTORY_CAP, DEFAULT_HISTORY_CAP)

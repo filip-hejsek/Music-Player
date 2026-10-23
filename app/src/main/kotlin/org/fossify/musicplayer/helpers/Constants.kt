@@ -48,8 +48,6 @@ const val EXTRA_QUEUE_ENTRY_ID = "EXTRA_QUEUE_ENTRY_ID"
 const val EXTRA_QUEUE_REPETITION = "EXTRA_QUEUE_REPETITION"
 
 // shared preferences
-const val SHUFFLE = "shuffle"
-const val PLAYBACK_SETTING = "playback_setting"
 const val HISTORY_CAP = "history_cap"
 const val DEFAULT_HISTORY_CAP = 100
 const val AUTOPLAY = "autoplay"
@@ -85,7 +83,6 @@ const val TAB_GENRES = 32
 const val ACTIVITY_PLAYLIST_FOLDER = 64
 
 const val FLAG_MANUAL_CACHE = 1
-const val FLAG_IS_CURRENT = 2
 
 const val ALL_TABS_MASK = TAB_PLAYLISTS or TAB_FOLDERS or TAB_ARTISTS or TAB_ALBUMS or TAB_TRACKS
 

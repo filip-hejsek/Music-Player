@@ -151,7 +151,7 @@ internal fun PlaybackService.getMediaSessionCallback() = object : MediaLibrarySe
         if (queue == null) {
             settableFuture.set(MediaSession.MediaItemsWithStartPosition(emptyList(), 0, 0))
         } else {
-            queue.run {
+            queue.launchOnQueue {
                 val (items, startPositionMs) = resumptionTimeline()
                 settableFuture.set(MediaSession.MediaItemsWithStartPosition(items, 0, startPositionMs))
             }
@@ -189,7 +189,7 @@ internal fun PlaybackService.getMediaSessionCallback() = object : MediaLibrarySe
 
             val tracks = queueItems.toTracks()
             val startTrackIndex = queueItems.indexOfFirst { it.mediaId == startItemId }.coerceAtLeast(0)
-            queue.run {
+            queue.launchOnQueue {
                 val items = playTracksNow(tracks, startTrackIndex)
                 settableFuture.set(MediaSession.MediaItemsWithStartPosition(items, 0, startPositionMs.coerceAtLeast(0)))
             }
