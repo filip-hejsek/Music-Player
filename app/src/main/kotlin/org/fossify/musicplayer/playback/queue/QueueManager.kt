@@ -81,6 +81,15 @@ class QueueManager(
         mutex.withLock { loadLocked() }
     }
 
+    /** Re-reads the tracks (e.g. after a setting that changes track titles), keeping queue, history and cursor. */
+    suspend fun reloadTracks() {
+        mutex.withLock {
+            trackCache = emptyMap()
+            missingTrackIds = emptySet()
+            refresh()
+        }
+    }
+
     private suspend fun loadLocked(): Snapshot {
         dao.ensureCursor(PlaybackCursorRow())
         return refresh()
@@ -409,6 +418,27 @@ class QueueManager(
 
     /** Called from the periodic ticker. Deliberately doesn't reload anything. */
     suspend fun savePosition(positionMs: Long) = dao.updatePositionMs(positionMs)
+
+    /** The saved in-track position of the head, for restoring playback. */
+    suspend fun savedPositionMs(): Long = mutex.withLock { snap().cursor.positionMs }
+
+    /**
+     * Pause markers can end up at the head when the user drags one to the front of a waiting queue.
+     * Such a marker has nothing left to pause, so it is simply dropped. Returns true if anything was removed.
+     */
+    suspend fun dropLeadingPauseMarkers(): Boolean = mutex.withLock {
+        val s = snap()
+        if (s.isActive) {
+            return@withLock false
+        }
+        val ids = s.items.drop(s.headIndex).takeWhile { it.entry == null || it.entry is QueueEntry.PauseMarker }
+            .filter { it.entry is QueueEntry.PauseMarker }
+            .map { it.id }
+        if (ids.isNotEmpty()) {
+            commit(QueueMutation(deleteIds = ids))
+        }
+        ids.isNotEmpty()
+    }
 
     private suspend fun advance(s: Snapshot, play: Boolean, extraRepetitions: Map<Long, Repetitions>): NavigationResult? {
         val items = s.items

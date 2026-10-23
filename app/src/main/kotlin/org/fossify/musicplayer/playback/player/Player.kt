@@ -13,8 +13,6 @@ import androidx.media3.session.MediaLibraryService
 import org.fossify.musicplayer.activities.MainActivity
 import org.fossify.musicplayer.extensions.broadcastUpdateWidgetState
 import org.fossify.musicplayer.extensions.config
-import org.fossify.musicplayer.extensions.currentMediaItems
-import org.fossify.musicplayer.extensions.setRepeatMode
 import org.fossify.musicplayer.helpers.EXTRA_OPEN_PLAYER
 import org.fossify.musicplayer.helpers.SEEK_INTERVAL_MS
 import org.fossify.musicplayer.playback.PlaybackService
@@ -39,9 +37,7 @@ internal fun PlaybackService.initializeSessionAndPlayer(
 
     withPlayer {
         addListener(playerListener)
-        setRepeatMode(config.playbackSetting)
         setPlaybackSpeed(config.playbackSpeed)
-        shuffleModeEnabled = config.isShuffleEnabled
         mediaSession.setCustomLayout(getCustomLayout())
         SimpleEqualizer.setupEqualizer(this@initializeSessionAndPlayer, player)
     }
@@ -87,13 +83,5 @@ internal fun PlaybackService.updatePlaybackState() {
     withPlayer {
         updatePlaybackInfo(player)
         broadcastUpdateWidgetState()
-        val currentMediaItem = currentMediaItem
-        if (currentMediaItem != null) {
-            mediaItemProvider.saveRecentItemsWithStartPosition(
-                mediaItems = currentMediaItems,
-                current = currentMediaItem,
-                startPosition = currentPosition
-            )
-        }
     }
 }

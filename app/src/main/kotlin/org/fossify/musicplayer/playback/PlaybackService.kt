@@ -32,6 +32,8 @@ import org.fossify.musicplayer.helpers.getPermissionToRequest
 import org.fossify.musicplayer.playback.library.MediaItemProvider
 import org.fossify.musicplayer.playback.player.SimpleMusicPlayer
 import org.fossify.musicplayer.playback.player.initializeSessionAndPlayer
+import org.fossify.musicplayer.playback.queue.LooperDispatcher
+import org.fossify.musicplayer.playback.queue.QueueController
 import org.fossify.musicplayer.playback.queue.QueueManager
 import org.fossify.musicplayer.playback.queue.QueueState
 
@@ -44,8 +46,8 @@ class PlaybackService : MediaLibraryService(), MediaSessionService.Listener {
 
     internal var currentRoot = ""
 
-    // TODO: once the timeline materializer exists, run the manager on the player thread instead.
-    private val queueScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    // Queue operations touch the ExoPlayer instance (see TimelineMaterializer), so they run on the player thread.
+    private lateinit var queueScope: CoroutineScope
 
     override fun onCreate() {
         super.onCreate()
@@ -63,7 +65,10 @@ class PlaybackService : MediaLibraryService(), MediaSessionService.Listener {
         clearListener()
         stopSleepTimer()
         SimpleEqualizer.release()
-        queueManager = null
+        player.navigator = null
+        queueController?.release()
+        queueController = null
+        _queueState.value = null
         queueScope.cancel()
     }
 
@@ -86,6 +91,7 @@ class PlaybackService : MediaLibraryService(), MediaSessionService.Listener {
     }
 
     private fun initializeQueue() {
+        queueScope = CoroutineScope(SupervisorJob() + LooperDispatcher(player.applicationLooper))
         val manager = QueueManager(
             dao = queueEntriesDAO,
             // blocking Room queries, so keep them off the manager's coroutine thread
@@ -95,8 +101,10 @@ class PlaybackService : MediaLibraryService(), MediaSessionService.Listener {
             scope = queueScope,
         )
 
-        queueManager = manager
-        queueScope.launch { manager.load() }
+        val controller = QueueController(player, manager, _queueState, queueScope)
+        player.navigator = controller
+        queueController = controller
+        controller.start()
     }
 
     private fun releaseMediaSession() {
@@ -151,7 +159,7 @@ class PlaybackService : MediaLibraryService(), MediaSessionService.Listener {
         val queueState: StateFlow<QueueState?> = _queueState.asStateFlow()
 
         /** Set while the service is alive; UI dispatches queue intents through it. */
-        var queueManager: QueueManager? = null
+        var queueController: QueueController? = null
             private set
 
         fun updatePlaybackInfo(player: Player) {
