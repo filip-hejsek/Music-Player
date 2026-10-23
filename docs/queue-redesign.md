@@ -66,9 +66,15 @@ sealed class QueueEntry {
 Each entry may optionally be part of a group.
 The player will group items that are added to the queue together in one operation.
 
-Groups should ideally consist of consecutive queue entries. TBD if this is enforced.
-
-**Suggestion.** Group membership could be a plain tag, no positional invariant enforced.
+Groups should ideally consist of consecutive queue entries, but this is **not enforced**.
+Group membership is a plain tag with no positional invariant. Consequences, as implemented:
+- Moving an entry out of a group's range leaves it in the group.
+- A pause marker inserted between two entries of the same group joins that group, so the group
+  stays visually contiguous; otherwise a marker has no group.
+- Removing a group removes only its not-yet-played entries (history and the active entry stay).
+- A group is deleted once its last entry is gone (done in the same transaction).
+- Several tracks added in one operation get an unlabeled `MANUAL` group (blank label) unless the
+  caller supplies a `QueueGroupSpec`. Adding a single track creates no group.
 
 **Suggestion.** Possible implementation:
 ```kotlin
@@ -87,7 +93,10 @@ data class QueueGroup(
 There is a single list containing current, future and past queue entries.
 A **cursor** splits it into a queue and a history. 
 
-History has a configurable cap; oldest entries are pruned once the cursor advances past it.
+History has a configurable cap (`Config.historyCap`, default 100, no UI yet); the oldest entries are
+pruned in the same transaction as any cursor move (next, previous, jump, track finished), never at
+other times. A history that is over the cap for another reason (e.g. migrated from the old queue)
+therefore stays over it until the next move.
 
 The cursor must be well-defined even when no entry is active (after a pause marker, or when
 the queue has been played to the end), so it is a *boundary* in the list, not a pointer to
@@ -100,9 +109,11 @@ an entry:
 **Suggestion.** Possible implementation:
 ```kotlin
 data class QueueState(
-    val history: List<QueueEntry>,
-    val current: QueueEntry?,       // the head, if it is active
-    val upcoming: List<QueueEntry>, // everything after `current`; includes the head if it is not active
+    val history: List<QueueEntry.TrackEntry>,   // never contains pause markers
+    val current: QueueEntry.TrackEntry?,        // the head, if it is active
+    val upcoming: List<QueueEntry>,             // everything after `current`; includes the head if it is not active
+    val groups: Map<Long, QueueGroup> = emptyMap(),
+    val canUndoReorder: Boolean = false,        // the last shuffle/sort can still be reverted
 ) {
     companion object {
         val Empty = QueueState(emptyList(), null, emptyList())
@@ -138,23 +149,34 @@ automatically puts the finished track in history.
 Entries with infinite repeat count still track the current number of repeats
 (`completedRepetitions` keeps counting up, `remainingRepetitions` stays infinite).
 
+When a repetition finishes, `completedRepetitions` goes up and a finite `remainingRepetitions`
+goes down. If nothing remains, the entry leaves the head with `remainingRepetitions == 0`, which
+is the one case where a history entry has zero remaining repetitions (see **previous** below).
+
 When a pause marker is reached, playback is stopped and the pause marker is **removed**.
 The player advances to the next item in the queue, but it doesn't start playing until
 the user hits the play button.
 
 **Requirement.** The history never contains pause marker entries.
 
-TBD: What to do with multiple consecutive pause marker entries. Options:
-- Disallow them
-- Coalesce them
-- Handle them during playback
+**Decision.** Consecutive pause markers are disallowed at insertion: a marker can't be placed next
+to another one (the operation reports failure). Moving entries can still make markers adjacent,
+and removals can too, so playback also handles it defensively: reaching a run of markers consumes
+all of them at once, with a single stop. A marker that ends up at the head while nothing is active
+(e.g. dragged to the front of a waiting queue) has nothing left to pause and is dropped.
+A marker can only be inserted after the active entry or after an upcoming entry, not into history.
 
 ### Navigation
 
 - **Next** advances the cursor and **marks the history entry as skipped**.
 - **Previous** moves the cursor back
 - Both always **skip all remaining repeats** of the current entry
-- **Next** honors pause markers
+- **Next** honors pause markers: the marker is removed, and playback stops on the entry after it
+  (that entry becomes the head but is not active)
+- Tapping an entry (jump) moves the head there in either direction. Entries jumped over go to
+  history (forwards) or return to the queue (backwards). Pause markers jumped over are removed,
+  since history never contains them.
+- **Previous** with an empty history restarts the current track.
 
 #### What happens to the repetition counters when navigating?
 E.g. user is on repeat 2 of 4, presses next, then previous.
@@ -165,11 +187,18 @@ leaves the head with its remaining repeats intact, and gets them back when previ
 out of history. Only finishing a repetition changes the counters (`completedRepetitions`
 goes up by one, a finite `remainingRepetitions` goes down by one).
 
+**Exception, as implemented.** An entry that was played to the end has `remainingRepetitions == 0` in
+history. When previous (or a backwards jump) returns it to the queue, its remaining count is reset
+to 1, i.e. it plays once more, so the invariant "an entry in the queue has at least one remaining
+repetition" holds. Entries that were only skipped keep their remaining repeats untouched.
+
 With this model "skipped" doesn't need its own field: a history entry was skipped if and only if
 it has no completions (`completedRepetitions == 0`). An entry that is left after at least one
 completed repetition counts as played, even if its remaining repetitions were skipped. An entry in
-the queue or active always has at least one remaining repetition; editing the repeat count of the
-active entry clamps to that.
+the queue or active always has at least one remaining repetition. Editing the repeat count sets
+the *total* number of plays (or infinite); completed repetitions count towards it, and the result is
+clamped so at least one repetition remains. It works on the active entry and on upcoming entries,
+not on history.
 
 ### Shuffle
 
@@ -180,12 +209,32 @@ on the queue. The following operations are supported:
 - undo a shuffle
 - sort by album and track number
 
+As implemented, these only permute the upcoming *track* entries among the positions those entries
+already occupy. Pause markers and (for "shuffle a group") entries of other groups stay exactly where
+they are. The active entry and history are never touched. Sorting compares album title
+(case-insensitive), disc number, track number and title.
+
+Undo is a single level: it remembers the positions before the last shuffle/sort and is discarded by
+any other change to the queue (including playback advancing). It restores only entries that still exist.
+
+In the UI, the shuffle button in `TrackActivity` performs "shuffle all" (long press undoes), and
+the repeat button cycles: off, repeat forever, pause marker after the current entry.
+
 ### Adding items to the queue
 
-Clicking on a track adds it to the queue. If the queue was empty, playback starts immediately.
+Clicking on a track adds it to the **end** of the queue. If the queue was empty, playback starts immediately.
 
-A while album can be added at once. If the queue was empty, playback will not start
+A whole album can be added at once. If the queue was empty, playback will not start
 automatically, so the user can adjust the queue before playing (e.g. shuffle).
+Currently all multi-track adds produce an unlabeled `MANUAL` group; adding an album with an
+`ALBUM` group (and a label) is not wired up yet.
+
+Tracks from outside the app are different, since they ask to be played: files opened from other
+apps and controllers that bring their own queue (Android Auto, assistants) are inserted right after
+the current entry (`PlayNext`) and the first requested one is jumped to and played immediately.
+Whatever was queued before stays in the queue. A new session timeline is derived from the logical
+queue and handed back to the session. Still open: `onAddMediaItems` from external controllers lets
+Media3 append raw items to the timeline, bypassing the queue.
 
 ### Active entry
 
@@ -197,10 +246,24 @@ An entry is considerd active only if some playback actually occured. When the pl
 there may be no active entry, even when the queue is not empty. This means that no entry will be active
 after encountering a pause marker.
 
+The head becomes active when playback of it actually starts (`markActive`, triggered by the play
+request), and stays active across repetitions. Moving the cursor sets the new active flag from
+whether playback should continue (`play`), except that stopping at a pause marker, or running out of
+tracks, leaves nothing active.
+
 ### Persistence
 
 All playback state should be persisted when the app is closed. After reopening,
 playback will be paused, but all other state will be restored.
+
+On start, the queue is loaded from Room and the player is prepared (paused) on the saved head at
+the saved position. If the process was killed and a controller asks to resume, the timeline is
+derived from the stored queue the same way.
+
+Entries whose track is gone (the media scanner recreates `tracks` rows) are skipped during
+playback and hidden from the state, but their rows stay in the database, since the track may come
+back. Tracks are loaded once and cached; the `tracks` table is re-read only when a queued track id is
+not in the cache, and not again for ids already known to be missing.
 
 
 Persistent Data Storage
@@ -213,12 +276,15 @@ It's desirable to be able to commit all state atomically. SharedPreferences shou
 ideally store only actual preferences, and no state.
 
 During playback, in-track position should only be written on a periodic ticker (~5–10s)
-to avoid excessive writes. **This is a change from the existing code.** Everything other
+to avoid excessive writes. As implemented: every 5 s while playing, plus on pause (and on any cursor
+move, which resets it to 0). **This is a change from the existing code.** Everything other
 than playback time can (and should) still be written eagerly.
 
 Queue items can be reordered by the user, so choose a suitable ordering representation.
 
-**Suggestion.** You can represent ordering with a fractional (`Double`) position.
+**Decision.** Ordering uses a fractional (`Double`) position. Inserting or moving an entry writes
+one row. When the gap between neighbours drops below `1e-6`, all positions are renumbered to
+1.0, 2.0, ... in one transaction, moving the cursor boundary with them.
 
 
 The ExoPlayer Timeline
@@ -233,13 +299,27 @@ repetition number (via metadata extras).
 
 How to materialize items:
 - There must be an upper bound on how many `MediaItem`s are in the timeline at any given time.
-  Only materialize a fixed window. Prune old entries before materializing new ones. Window size
+  Only materialize a fixed window (`TIMELINE_WINDOW_SIZE`, currently 5 physical items). Prune old entries before materializing new ones. Window size
   is counted in physical items, not logical entries, so that a large repeat count doesn't
   result in a large number of `MediaItem`s.
 - Media3's native `shuffleModeEnabled`/`ShuffleOrder` should never be used. The existing
   `SET_SHUFFLE_ORDER`/`setShuffleIndices` hack should be removed.
 - Repetitions should be handled by generating duplicate `MediaItem`s. As an optimization,
   `repeatMode` can be used when an item with infinite repeats is playing.
+
+As implemented:
+- The materialized window starts at the head and is cut off at a pause marker, so the last item
+  before the marker ends playback; the logical queue then consumes the marker. An entry with infinite
+  repeats is materialized once and nothing after it; while it is the current item, `REPEAT_MODE_ONE`
+  is on, otherwise the repeat mode is always off.
+- Physical `mediaId` is `"<entryId>:<repetition>"` (repetition is 0-based and continues from
+  `completedRepetitions`), so every physical item has a distinct id. The entry id and repetition
+  are also in the metadata extras (`EXTRA_QUEUE_ENTRY_ID`, `EXTRA_QUEUE_REPETITION`).
+  `MediaItem.isSameMedia()` compares the track's `mediaStoreId` from the extras instead of `mediaId`.
+- After queue edits or when the player advanced by itself, the timeline is refreshed in place:
+  already-played items are dropped, and the items after the current one are only replaced from the
+  first one that differs, so the item prepared for gapless playback survives. Only if the player
+  isn't on the head (the head changed) is the whole timeline rebuilt, which restarts playback.
 
 
 Architecture
@@ -255,11 +335,27 @@ Room (queue_entries, queue_groups, playback_cursor)
         │                    QueueActivity / QueueAdapter (render-only)
         │                         │ dispatches actions (move/remove/clear/...)
         ▼                         ▼
+QueueController  (glue; player events and UI intents)
+        │ ↑ NavigationResult        ↑ intents
+        ▼ │
 TimelineMaterializer  <───  QueueManager (action handlers)
         │
         ▼
    ExoPlayer timeline (via SimpleMusicPlayer / MediaController)
 ```
+
+`QueueManager` only deals with the logical queue and knows nothing about ExoPlayer. Every operation
+computes a `QueueMutation` (new entries/group, deletions, new positions, new counters, new cursor)
+from an in-memory snapshot, commits it through one `QueueDao.commit()` transaction, then reloads the
+snapshot from Room and publishes the new `QueueState`. Room is always the source of truth.
+Navigation operations return a `NavigationResult` (new head, whether it is active, whether a pause
+marker stopped playback, whether the same entry repeats).
+
+`QueueController` is the new glue class that the spec didn't have. It reacts to player events
+(play requested, next/previous requested, a repetition finished), calls the manager, and brings the
+timeline in line through `TimelineMaterializer`. The player never decides what plays next: when it
+finishes an item it reports that, and the manager works out what follows. The UI sends its intents
+through the controller too (`post`, `jumpTo`, `addTracks`, ...), so each is followed by a timeline sync.
 
 The UI never talks to the `Player` timeline directly and never mutates its own local list —
 it renders the queue state and sends intents back. This is a change from the existing code:
@@ -269,7 +365,9 @@ custom command.
 
 ### Exposing the state
 
-`QueueManager` lives on `PlaybackService`. The service doesn't declare a separate process in the
+`QueueManager` and `QueueController` live on `PlaybackService`
+(`PlaybackService.queueState` and `PlaybackService.queueController`; `queueState` is a
+`StateFlow<QueueState?>`, `null` = not loaded). The service doesn't declare a separate process in the
 manifest, so UI and service share one, and `queueState` can be exposed the way the existing
 playback state is: `PlaybackService.Companion` already mirrors `isPlaying`, `currentMediaItem`
 and `nextMediaItem` into static fields (updated by `updatePlaybackInfo()`) for fast reads
@@ -287,8 +385,9 @@ Differences from the existing fields:
 
 ### Threading
 
-All queue mutations are serialized on the player thread, like `PlaybackService.withPlayer { }`
-does today, because materialization touches the `ExoPlayer` instance. Room access goes through
+All queue mutations run on a coroutine scope bound to the player's looper (`LooperDispatcher`),
+like `PlaybackService.withPlayer { }` does today, because materialization touches the `ExoPlayer`
+instance. In addition, `QueueManager` serializes operations with a mutex. Room access goes through
 the suspend DAO, which runs on the database's query executor.
 
 ### Existing code to rewire
@@ -305,7 +404,8 @@ The new queue replaces these pieces:
 - The shuffle-aware helpers in `extensions/Player.kt` (`shuffledMediaItemsIndices`,
   `currentMediaItemsShuffled`, ...) and the shuffle toggle in `TrackActivity`/`Config.isShuffleEnabled`
 
-These must route through the `QueueManager` instead of the timeline:
+All of the above has been removed (including `PlaybackSetting.REPEAT_PLAYLIST`, `Config.playbackSetting`
+and `FLAG_IS_CURRENT`). The following now route through the queue instead of the timeline:
 - `SimpleMusicPlayer.seekToNext()`/`seekToPrevious()`, since the notification, headset buttons
   and other controllers reach the player this way
 - `MediaSessionCallback.onSetMediaItems()`/`onAddMediaItems()`, for external controllers
@@ -314,14 +414,15 @@ These must route through the `QueueManager` instead of the timeline:
 identifies a window: `MediaItem.isSameMedia()`, `SimpleMusicPlayer.setNextMediaItem()`,
 `SimpleControllerActivity` (filtering the tracks it adds by `mediaId`),
 `MediaSessionCallback.onSetMediaItems()`. Materialized items from the same track share that id,
-so these must switch to the entry ID / repetition extras from the previous section, or the
-materializer must give every physical item a distinct `mediaId`.
+so these had to change. Resolved by giving every physical item a distinct `mediaId` (see above).
 
 
 Room DB Schema
 --------------
 
-**This whole section is only a suggestion.** You can use any reasonable database schema you like.
+**This whole section was only a suggestion.** The implementation follows the schema below, with the
+deviations listed in each subsection. Entities live in `QueueEntryRow.kt`, `QueueGroupRow.kt` and
+`PlaybackCursorRow.kt`, and the singleton cursor row is created on first load (`ensureCursor`).
 
 ### Entities
 
@@ -384,8 +485,7 @@ Notes:
   id (`mediaStoreId == 0`, e.g. `FLAG_MANUAL_CACHE`) are not unique under that key; this is
   an existing limitation, but now it would affect entries that should be distinct.
 
-`historyCap` is a plain integer setting (like the existing `playbackSpeed`/
-`isShuffleEnabled`), not something that needs transactional consistency — keep it in
+`historyCap` is a plain integer setting (like the existing `playbackSpeed`), not something that needs transactional consistency — keep it in
 `Config`, as a member next to the other settings, with the key and default in `Constants.kt`:
 
 ```kotlin
@@ -396,117 +496,48 @@ var historyCap: Int
 
 ### DAO
 
-This is an `abstract class` rather than an `interface`, so that the `@Transaction` method can have a body.
+This is an `abstract class` rather than an `interface`, so that the `@Transaction` methods can have a body.
 The existing DAOs are blocking, but `room-ktx` is already a dependency, so `suspend` works.
 
+**Deviation from the original suggestion.** The DAO does not have one query per operation
+(`deleteQueue`, `deleteGroupFromQueue`, `pruneOldestHistory`, `getEntryAfter`, ...). The manager works
+out what changes from its in-memory snapshot and the DAO only applies it, so history pruning,
+group deletion and so on need no dedicated SQL and always commit together with the cursor move.
+
 ```kotlin
+data class QueueMutation(
+    val newGroup: QueueGroupRow? = null,          // inserted first; its id is assigned to every new entry
+    val newEntries: List<QueueEntryRow> = emptyList(),
+    val deleteIds: Collection<Long> = emptyList(),
+    val positions: Map<Long, Double> = emptyMap(),        // entry id -> new position
+    val repetitions: Map<Long, Repetitions> = emptyMap(),  // entry id -> new counters
+    val cursor: PlaybackCursorRow? = null,
+)
+
 @Dao
 abstract class QueueDao {
-    @Query("SELECT * FROM queue_entries ORDER BY position")
-    abstract suspend fun getAll(): List<QueueEntryRow>
+    getAll(): List<QueueEntryRow>            // ORDER BY position, id
+    getAllGroups(): List<QueueGroupRow>
+    getCursor(): PlaybackCursorRow?
+    ensureCursor(cursor): Long               // INSERT OR IGNORE, for fresh installs
+    setCursor(cursor)                        // INSERT OR REPLACE
+    updatePositionMs(positionMs)             // the ticker; touches nothing else
+    updateIsActive(isActive)
 
-    @Query("SELECT * FROM queue_entries WHERE id = :id")
-    abstract suspend fun getEntryById(id: Long): QueueEntryRow?
+    /** Applies a whole QueueMutation in one transaction; returns ids of inserted entries. */
+    @Transaction open suspend fun commit(mutation: QueueMutation): List<Long>
 
-    @Query("SELECT * FROM queue_entries WHERE position > :fromPosition ORDER BY position LIMIT 1")
-    abstract suspend fun getEntryAfter(fromPosition: Double): QueueEntryRow?
-
-    @Query("SELECT * FROM queue_entries WHERE position < :fromPosition ORDER BY position DESC LIMIT 1")
-    abstract suspend fun getEntryBefore(fromPosition: Double): QueueEntryRow?
-
-    @Query("SELECT * FROM queue_groups WHERE id = :id")
-    abstract suspend fun getGroup(id: Long): QueueGroupRow?
-
-    @Insert
-    abstract suspend fun insertEntries(entries: List<QueueEntryRow>): List<Long>
-
-    @Insert
-    abstract suspend fun insertGroup(group: QueueGroupRow): Long
-
-    @Query("UPDATE queue_entries SET position = :position WHERE id = :id")
-    abstract suspend fun updateEntryPosition(id: Long, position: Double)
-
-    @Query(
-        "UPDATE queue_entries SET completed_repetitions = :completed, remaining_repetitions = :remaining WHERE id = :id"
-    )
-    abstract suspend fun updateRepetitions(id: Long, completed: Int, remaining: Int?)
-
-    @Query("DELETE FROM queue_entries WHERE id = :id")
-    abstract suspend fun deleteEntry(id: Long)
-
-    /** Queue = everything from the head on, except the active entry (which can't be removed this way). */
-    @Query("DELETE FROM queue_entries WHERE position >= :headPosition AND id IS NOT :activeEntryId")
-    abstract suspend fun deleteQueue(headPosition: Double, activeEntryId: Long?)
-
-    @Query("DELETE FROM queue_entries WHERE position < :headPosition")
-    abstract suspend fun deleteHistory(headPosition: Double)
-
-    @Query(
-        "DELETE FROM queue_entries WHERE group_id = :groupId AND position >= :headPosition AND id IS NOT :activeEntryId"
-    )
-    abstract suspend fun deleteGroupFromQueue(groupId: Long, headPosition: Double, activeEntryId: Long?)
-
-    /** Groups don't cascade from their entries, so clean up the ones that ended up empty. */
-    @Query("DELETE FROM queue_groups WHERE id NOT IN (SELECT DISTINCT group_id FROM queue_entries WHERE group_id IS NOT NULL)")
-    abstract suspend fun deleteEmptyGroups()
-
-    @Query("SELECT COUNT(*) FROM queue_entries WHERE position < :headPosition")
-    abstract suspend fun getHistoryCount(headPosition: Double): Int
-
-    @Query(
-        """
-        DELETE FROM queue_entries WHERE id IN (
-            SELECT id FROM queue_entries
-            WHERE position < :headPosition
-            ORDER BY position ASC LIMIT :count
-        )
-        """
-    )
-    abstract suspend fun pruneOldestHistory(headPosition: Double, count: Int)
-
-    @Query("SELECT * FROM playback_cursor WHERE id = 0")
-    abstract suspend fun getCursor(): PlaybackCursorRow?
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    abstract suspend fun setCursor(cursor: PlaybackCursorRow)
-
-    /** Structural cursor change (next/previous/pause marker): written together with the entry changes. */
-    @Query(
-        "UPDATE playback_cursor SET head_position = :headPosition, is_active = :isActive, position_ms = :positionMs WHERE id = 0"
-    )
-    abstract suspend fun updateCursor(headPosition: Double, isActive: Boolean, positionMs: Long)
-
-    /** For the periodic ticker; touches nothing but the in-track position. */
-    @Query("UPDATE playback_cursor SET position_ms = :positionMs WHERE id = 0")
-    abstract suspend fun updatePositionMs(positionMs: Long)
-
-    @Query("DELETE FROM queue_entries")
-    abstract suspend fun deleteAllEntries()
-
-    @Query("DELETE FROM queue_groups")
-    abstract suspend fun deleteAllGroups()
-
-    /**
-     * Structural replace-everything, used for full queue rebuilds (e.g. "play this album now").
-     * Don't use `RoomDatabase.clearAllTables()` here: it would wipe `tracks`, `playlists` etc. as well.
-     */
-    @Transaction
-    open suspend fun replaceAll(
-        entries: List<QueueEntryRow>,
-        groups: List<QueueGroupRow>,
-        cursor: PlaybackCursorRow
-    ) {
-        deleteAllEntries()
-        deleteAllGroups()
-        groups.forEach { insertGroup(it) }
-        insertEntries(entries)
-        setCursor(cursor)
-    }
+    /** Replace-everything. Don't use clearAllTables(): it would wipe tracks, playlists etc. */
+    @Transaction open suspend fun replaceAll(entries, groups, cursor)
+    // plus the single-row primitives used by commit(): insertGroup, insertEntries,
+    // updateEntryPosition, updateRepetitions, deleteEntries (chunked, SQLite variable limit),
+    // deleteEmptyGroups, deleteAllEntries, deleteAllGroups
 }
 ```
 
-When groups are replaced, the group ids in `entries` must be remapped to the ids returned by
-`insertGroup`, or inserted with explicit ids.
+`commit()` order: insert group, delete, update positions, update counters, insert entries, set cursor,
+delete empty groups. When groups are replaced via `replaceAll`, entries are inserted with their
+`groupId` as given, so the groups need explicit ids.
 
 ### Mappers
 
@@ -537,15 +568,22 @@ fun QueueEntry.toRow(position: Double): QueueEntryRow = when (this) {
 }
 ```
 
-Build the `tracks` map once per load from `AudioHelper.getAllTracks()` (keyed by `mediaStoreId`,
-as `AudioHelper.getQueuedTracks()` does today) instead of querying per row.
+The `tracks` map is built from `AudioHelper.getAllTracks()` (keyed by `mediaStoreId`, as
+`AudioHelper.getQueuedTracks()` did) and cached; see **Persistence** for when it is refreshed.
+A missing track yields a null entry; the row is kept.
 
 ### Database version and migration
 
-A migration has been implemented, but its usefulness is questionable as the package name was changed,
-so it's not possible to upgrade from versions before fork, and there is no release yet for the fork.
+The database is at version 16. `MIGRATION_15_16` creates the three tables and converts the old
+`queue_items` rows: each becomes a track entry that plays once, the old current track becomes the head
+(everything before it is history, which is why the history may start out over the cap), the cursor is
+active if the old `last_position` was greater than 0, and `queue_items` is dropped. The old queue is
+stored in unshuffled order, so a shuffled order is not preserved.
 
-The migration should be removed, along with all migrations from previous versions.
+**Still open.** The package name was changed in the fork, so upgrading from versions before the fork
+is impossible, and there is no release of the fork yet. The migration's usefulness is therefore
+questionable; the earlier plan was to remove it along with all migrations from previous versions.
+This has not been done.
 
 The `UPDATE` queries on `playback_cursor` do nothing if the singleton row doesn't exist, so
 the row must be inserted on first load for fresh installs.
@@ -556,17 +594,32 @@ Code Organization
 
 **Requirement.** Most of the new code lives in a new package, `playback/queue/`.
 
-**Suggestion.** Possible code organization:
+**As implemented** (all in `playback/queue/`):
 ```
 playback/
   queue/
-    QueueEntry.kt            // sealed class — logical model
+    QueueEntry.kt            // sealed class, QueueGroup, QueueGroupSource, QueueState
     QueueEntryRow.kt         // Room entity
     QueueGroupRow.kt         // Room entity
     PlaybackCursorRow.kt     // Room entity
-    QueueDao.kt              // Room DAO
+    QueueDao.kt              // Room DAO, plus QueueMutation and Repetitions
     QueueMappers.kt          // Row <-> logical model
-    QueueManager.kt          // owns queue state, cursor, navigation
+    QueueManager.kt          // owns queue state, cursor, navigation; no ExoPlayer knowledge
     TimelineMaterializer.kt  // logical entries -> physical MediaItems
-    QueuePersistence.kt      // write scheduling
+    QueueController.kt       // glue between manager and player; position ticker; UI intents
+    LooperDispatcher.kt      // coroutine dispatcher on the player's looper
 ```
+There is no `QueuePersistence.kt`: write scheduling is just the 5 s ticker in `QueueController`
+and eager writes through `QueueDao.commit()`.
+
+UI additions: `QueueActivity`/`QueueAdapter` render `QueueState` only (grouped rows, pause markers,
+group headers, a repeat-count dialog) and send intents through `queueController`.
+
+
+Known gaps
+----------
+
+- `historyCap` has no UI.
+- Album-level "add to queue" with a labeled `ALBUM` group is not wired up.
+- `onAddMediaItems` from external controllers bypasses the queue.
+- The migration question above.
