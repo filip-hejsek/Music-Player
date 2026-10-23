@@ -50,6 +50,8 @@ const val EXTRA_SHUFFLE_INDICES = "EXTRA_SHUFFLE_INDICES"
 // shared preferences
 const val SHUFFLE = "shuffle"
 const val PLAYBACK_SETTING = "playback_setting"
+const val HISTORY_CAP = "history_cap"
+const val DEFAULT_HISTORY_CAP = 100
 const val AUTOPLAY = "autoplay"
 const val SHOW_FILENAME = "show_filename"
 const val SWAP_PREV_NEXT = "swap_prev_next"
