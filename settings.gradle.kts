@@ -16,12 +16,11 @@ dependencyResolutionManagement {
 }
 include(":app")
 
-// Build against a local checkout of the commons fork instead of the published artifact.
+// Commons comes from the notfossify-commons submodule instead of the published artifact.
 // Set e.g. `commonsDir=../notfossify-commons` in ~/.gradle/gradle.properties or pass -PcommonsDir=...
-providers.gradleProperty("commonsDir").orNull?.let { dir ->
-    includeBuild(dir) {
-        dependencySubstitution {
-            substitute(module("org.fossify:commons")).using(project(":commons"))
-        }
+// to build against a different checkout.
+includeBuild(providers.gradleProperty("commonsDir").getOrElse("notfossify-commons")) {
+    dependencySubstitution {
+        substitute(module("org.fossify:commons")).using(project(":commons"))
     }
 }

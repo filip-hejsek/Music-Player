@@ -1,0 +1,4 @@
+[submodule "notfossify-commons"]
+	path = notfossify-commons
+	url = https://github.com/filip-hejsek/NotFossify-commons.git
+	branch = dev

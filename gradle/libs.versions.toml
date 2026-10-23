@@ -23,7 +23,7 @@ media = "1.8.0"
 media3 = "1.11.1"
 room = "2.8.5"
 #Fossify
-commons = "7.1.3"
+commons = "7.1.3" # ignored: substituted with the notfossify-commons submodule (settings.gradle.kts)
 #Gradle
 gradlePlugins-agp = "9.4.1"
 #build

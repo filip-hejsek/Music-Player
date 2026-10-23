@@ -18,6 +18,10 @@ upstream; no effort goes into making it usable for a general audience.
     the internal DB housekeeping in `AudioHelper.deleteTracks()` used by `SimpleMediaScanner`.
 - Org-coupled infrastructure (Fossify CI workflows, fastlane publishing, `.fossify/`, CODEOWNERS,
   issue templates, ...) was removed.
+- Commons comes from the `notfossify-commons` git submodule (fork of Fossify Commons, branch `dev`;
+  its own CLAUDE.md applies there), built as an included build that substitutes `org.fossify:commons`.
+  `-PcommonsDir=...` points it at another checkout. Once the fork has a release-worthy version,
+  the plan is to switch to a published artifact.
 - Gapless playback works well in practice; don't regress it.
 - Unused imports left over from the feature-stripping pass are meant to be removed in a later,
   dedicated cleanup pass.
@@ -47,7 +51,7 @@ upstream; no effort goes into making it usable for a general audience.
 
 ## Building
 
-Use `./gradlew assembleDebug` to build the app.
+Run `git submodule update --init` before building. Use `./gradlew assembleDebug` to build the app.
 
 The Android SDK should already be set up in the environment; notify the user if it isn't.
 In cloud sessions, some maven repositories may answer 429, in which case retrying the build
