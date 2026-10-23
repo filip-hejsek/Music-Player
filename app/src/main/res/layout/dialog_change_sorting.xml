@@ -46,9 +46,11 @@
                 android:textSize="@dimen/normal_text_size" />
         </RadioGroup>
 
-        <include
+        <ImageView
             android:id="@+id/use_for_this_playlist_divider"
-            layout="@layout/divider" />
+            android:layout_width="match_parent"
+            android:layout_height="@dimen/divider_height"
+            android:background="@color/divider_grey" />
 
         <org.fossify.commons.views.MyAppCompatCheckbox
             android:id="@+id/sorting_dialog_use_for_this_only"
