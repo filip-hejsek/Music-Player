@@ -44,8 +44,8 @@ const val EXTRA_YEAR = "year"
 const val EXTRA_DATE_ADDED = "date_added"
 const val EXTRA_ORDER_IN_PLAYLIST = "order_in_playlist"
 const val EXTRA_FLAGS = "flags"
-const val EXTRA_NEXT_MEDIA_ID = "EXTRA_NEXT_MEDIA_ID"
-const val EXTRA_SHUFFLE_INDICES = "EXTRA_SHUFFLE_INDICES"
+const val EXTRA_QUEUE_ENTRY_ID = "EXTRA_QUEUE_ENTRY_ID"
+const val EXTRA_QUEUE_REPETITION = "EXTRA_QUEUE_REPETITION"
 
 // shared preferences
 const val SHUFFLE = "shuffle"

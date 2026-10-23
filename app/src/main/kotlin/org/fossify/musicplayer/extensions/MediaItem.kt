@@ -23,6 +23,8 @@ import org.fossify.musicplayer.helpers.EXTRA_MEDIA_STORE_ID
 import org.fossify.musicplayer.helpers.EXTRA_ORDER_IN_PLAYLIST
 import org.fossify.musicplayer.helpers.EXTRA_PATH
 import org.fossify.musicplayer.helpers.EXTRA_PLAYLIST_ID
+import org.fossify.musicplayer.helpers.EXTRA_QUEUE_ENTRY_ID
+import org.fossify.musicplayer.helpers.EXTRA_QUEUE_REPETITION
 import org.fossify.musicplayer.helpers.EXTRA_TITLE
 import org.fossify.musicplayer.helpers.EXTRA_TRACK_ID
 import org.fossify.musicplayer.helpers.EXTRA_YEAR
@@ -143,7 +145,19 @@ fun Collection<MediaItem>.indexOfTrack(track: Track) = indexOfFirst { it.isSameM
 
 fun Collection<MediaItem>.indexOfTrackOrNull(track: Track) = indexOfFirstOrNull { it.isSameMedia(track) }
 
-fun MediaItem?.isSameMedia(track: Track) = this?.mediaId == track.mediaStoreId.toString()
+/**
+ * Materialized timeline items have a `mediaId` that is unique per physical item (see `TimelineMaterializer`),
+ * so the track is identified by its metadata instead.
+ */
+fun MediaItem?.isSameMedia(track: Track) = this?.mediaMetadata?.extras?.getLong(EXTRA_MEDIA_STORE_ID) == track.mediaStoreId
+
+/** Back-reference of a materialized item to its logical queue entry. */
+val MediaItem.queueEntryId: Long?
+    get() = mediaMetadata.extras?.takeIf { it.containsKey(EXTRA_QUEUE_ENTRY_ID) }?.getLong(EXTRA_QUEUE_ENTRY_ID)
+
+/** 0-based number of the repetition this item represents. */
+val MediaItem.queueRepetition: Int?
+    get() = mediaMetadata.extras?.takeIf { it.containsKey(EXTRA_QUEUE_REPETITION) }?.getInt(EXTRA_QUEUE_REPETITION)
 
 fun MediaItem.toTrack(): Track? = mediaMetadata.extras?.let { createTrackFromBundle(it) }
 
