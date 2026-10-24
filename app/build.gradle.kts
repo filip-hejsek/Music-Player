@@ -151,6 +151,7 @@ dependencies {
     implementation(libs.lottie)
     implementation(libs.m3u.parser)
     implementation(libs.autofittextview)
+    implementation(libs.kotlinx.coroutines.core)
     implementation(libs.jaudiotagger)
     coreLibraryDesugaring(libs.desugar.jdk.libs)
 

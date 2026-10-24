@@ -17,6 +17,7 @@ androidx-lifecycleprocess = "2.10.0"
 eventbus = "3.3.1"
 #Room
 lottie = "6.7.1"
+kotlinx-coroutines = "1.10.2"
 m3uParser = "1.4.0"
 media = "1.8.0"
 media3 = "1.11.1"
@@ -45,6 +46,8 @@ androidx-room-ktx = { module = "androidx.room:room-ktx", version.ref = "room" }
 androidx-room-compiler = { module = "androidx.room:room-compiler", version.ref = "room" }
 #Compose
 compose-detekt = { module = "io.nlopez.compose.rules:detekt", version.ref = "detektCompose" }
+#Kotlin
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
 #Fossify
 fossify-commons = { module = "org.fossify:commons", version.ref = "commons" }
 #EventBus
