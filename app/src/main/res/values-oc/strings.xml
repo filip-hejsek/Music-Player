@@ -43,7 +43,6 @@
     <string name="next_track">Seguent :</string>
     <string name="track_queue">Fila</string>
     <string name="add_to_queue">Apondre a la lista</string>
-    <string name="app_launcher_name">Lector àudio</string>
     <string name="playback_speed">Velocitat de lectura</string>
     <string name="add_folder_to_playlist">Apondre un dossièr a la lista de lectura</string>
     <string name="rename_song_error">Una error s\'es produsida pendent lo cambiament de nom</string>

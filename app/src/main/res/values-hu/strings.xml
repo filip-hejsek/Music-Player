@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_launcher_name">Zenelejátszó</string>
     <string name="playlist_empty">A lejátszási lista üres</string>
     <string name="rename_song">Dal átnevezése</string>
     <string name="rename_song_error">Hiba történt az átnevezés során</string>
