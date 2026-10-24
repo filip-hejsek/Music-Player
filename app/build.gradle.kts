@@ -83,12 +83,6 @@ android {
         }
     }
 
-    flavorDimensions.add("variants")
-    productFlavors {
-        register("foss")
-        register("gplay")
-    }
-
     sourceSets {
         getByName("main").java.directories.add("src/main/kotlin")
     }
