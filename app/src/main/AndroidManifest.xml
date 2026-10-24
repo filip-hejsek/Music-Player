@@ -66,11 +66,11 @@
         </activity>
 
         <activity
-            android:name="org.fossify.commons.activities.CustomizationActivity"
+            android:name="org.fossify.commons.activities.AboutActivity"
             android:configChanges="orientation"
             android:exported="false"
-            android:label="@string/customize_colors"
-            android:parentActivityName=".activities.SettingsActivity" />
+            android:label="@string/about"
+            android:parentActivityName=".activities.MainActivity" />
 
         <activity
             android:name=".activities.SettingsActivity"

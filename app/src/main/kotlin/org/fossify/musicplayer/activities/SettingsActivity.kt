@@ -36,7 +36,6 @@ class SettingsActivity : SimpleControllerActivity() {
         super.onResume()
         setupTopAppBar(binding.settingsAppbar, NavigationIcon.Arrow)
 
-        setupCustomizeColors()
         setupCustomizeWidgetColors()
         setupUseEnglish()
         setupLanguage()
@@ -48,12 +47,6 @@ class SettingsActivity : SimpleControllerActivity() {
 
         arrayOf(binding.settingsColorCustomizationSectionLabel, binding.settingsGeneralSettingsLabel).forEach {
             it.setTextColor(getProperPrimaryColor())
-        }
-    }
-
-    private fun setupCustomizeColors() = binding.apply {
-        settingsColorCustomizationHolder.setOnClickListener {
-            startCustomizationActivity()
         }
     }
 
