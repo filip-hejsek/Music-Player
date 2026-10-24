@@ -65,7 +65,6 @@
     <string name="rescan_media">Reanalisar dados</string>
     <string name="faq_1_title">Posso avançar/recuar rapidamente uma faixa?</string>
     <string name="faq_1_text">Toque nos textos de duração máxima/atual junto à barra de progresso para avançar ou recuar na posição da faixa.</string>
-    <string name="app_launcher_name">Reprodutor de músicas</string>
     <string name="playlist_empty">A lista de reprodução está vazia</string>
     <string name="rename_song">Renomear música</string>
     <string name="rename_song_error">Ocorreu um erro ao renomear</string>

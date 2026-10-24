@@ -8,7 +8,6 @@
     </plurals>
     <string name="volume">ระดับเสียง</string>
     <string name="playback_speed">ความเร็วในการเล่น</string>
-    <string name="app_launcher_name">เครื่องเล่นเพลง</string>
     <string name="playlist_empty">เพลย์ลิสต์ของคุณว่างเปล่า</string>
     <string name="rename_song">เปลี่ยนชื่อเพลง</string>
     <string name="rename_song_error">เกิดข้อผิดพลาดระหว่างการเปลี่ยนชื่อ</string>

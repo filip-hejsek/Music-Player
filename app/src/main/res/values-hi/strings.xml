@@ -14,7 +14,6 @@
     <string name="year">वर्ष</string>
     <string name="exclude_folder_description">किसी फोल्डर को बाहर करने से उसमें मौजूद सभी ऑडियो फाइलों का प्रदर्शन रुक जाएगा। प्लेलिस्ट में मैन्युअल रूप से जोड़ी गई फाइलें प्रभावित नहीं होंगी।</string>
     <string name="faq_1_text">आप सीकबार के पास वर्तमान या अधिकतम अवधि के टेक्स्ट पर क्लिक कर सकते हैं, जो गाने को या तो पीछे या आगे ले जाएगा।</string>
-    <string name="app_launcher_name">म्यूजिक प्लेयर</string>
     <string name="playlist_empty">आपकी प्लेलिस्ट खाली है</string>
     <string name="rename_song">गीत का नाम बदलें</string>
     <string name="rename_song_error">नाम बदलने के दौरान एक त्रुटि उत्पन्न हुई</string>

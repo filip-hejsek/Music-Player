@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_launcher_name">Seinnteoir Ceoil</string>
     <string name="playlist_empty">Tá do sheinnliosta folamh</string>
     <string name="rename_song">Amhráin a athainmniú</string>
     <string name="rename_song_error">Tharla earráid le linn an athainmnithe</string>

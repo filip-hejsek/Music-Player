@@ -47,7 +47,6 @@
         <item quantity="one">%d Albam</item>
         <item quantity="other">%d Albam</item>
     </plurals>
-    <string name="app_launcher_name">Cod Wade</string>
     <string name="create_playlist_label">Waxaad sameyn kartaa tax cusub adigoo dooranaya codeeyaha, albamka ama codadka aad rabtid adeegsanayana Liis -&gt; Taxda ku dar.</string>
     <string name="export_playlist">Dhoofi taxda</string>
     <string name="import_playlist">Dhoofso taxda</string>
