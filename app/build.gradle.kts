@@ -142,6 +142,7 @@ detekt {
 dependencies {
     implementation(libs.fossify.commons)
     implementation(libs.eventbus)
+    implementation(libs.gson)
     implementation(libs.androidx.media)
     implementation(libs.androidx.swiperefreshlayout)
     implementation(libs.androidx.constraintlayout)

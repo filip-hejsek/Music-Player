@@ -120,6 +120,6 @@ const val M3U_HEADER = "#EXTM3U"
 const val M3U_ENTRY = "#EXTINF:"
 const val M3U_DURATION_SEPARATOR = ","
 
-const val REPOSITORY_NAME = "Music-Player"
+const val REPOSITORY_URL = "https://github.com/filip-hejsek/music-player"
 
 fun getPermissionToRequest() = if (isTiramisuPlus()) PERMISSION_READ_MEDIA_AUDIO else PERMISSION_WRITE_STORAGE
